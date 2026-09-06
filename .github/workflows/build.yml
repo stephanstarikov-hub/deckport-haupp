@@ -1,0 +1,31 @@
+name: Build and test DeckPort VPN
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pnpm install --frozen-lockfile
+      - run: python scripts/fetch_deps.py
+      - run: pnpm typecheck && pnpm build
+      - run: python -m unittest discover -s tests -v
+      - run: bash -n install.sh
+      - run: python scripts/check_core.py
+      - run: sudo unshare --net --mount-proc python3 -u scripts/linux_smoke.py
+      - run: python scripts/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: decky-vpn-release
+          path: release/*

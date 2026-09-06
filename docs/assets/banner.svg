@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-labelledby="title desc">
+  <title id="title">DeckPort VPN</title>
+  <desc id="desc">Your connection. Your Deck. A VPN inside Gaming Mode.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0d1929"/><stop offset="1" stop-color="#111f34"/></linearGradient>
+    <linearGradient id="accent" x2="1" y2="1"><stop stop-color="#78f0cf"/><stop offset="1" stop-color="#71bfff"/></linearGradient>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#23344a" stroke-width="1"/></pattern>
+  </defs>
+  <rect width="1280" height="420" rx="24" fill="url(#bg)"/>
+  <rect x="740" width="540" height="420" fill="url(#grid)" opacity=".4"/>
+  <path d="M788 305H890L940 238H1080L1140 146H1280" fill="none" stroke="#71bfff" stroke-width="2" opacity=".35"/>
+  <path d="M800 340H990L1040 265H1168L1220 205H1280" fill="none" stroke="#78f0cf" stroke-width="2" opacity=".3"/>
+  <rect x="68" y="62" width="216" height="30" rx="15" fill="#173a3a"/>
+  <circle cx="87" cy="77" r="4" fill="#78f0cf"/>
+  <text x="101" y="82" fill="#9ae8d3" font-family="sans-serif" font-size="12" font-weight="600" letter-spacing="1.8">BUILT FOR GAMING MODE</text>
+  <text x="64" y="190" fill="#f2f7ff" font-family="sans-serif" font-size="76" font-weight="750" letter-spacing="-3">DeckPort<tspan fill="#78f0cf"> VPN</tspan></text>
+  <text x="68" y="245" fill="#b4c6dc" font-family="sans-serif" font-size="27">Your connection. Your Deck.</text>
+  <text x="68" y="342" fill="#8eabc7" font-family="monospace" font-size="15">ADD SUBSCRIPTION  →  PICK A SERVER  →  CONNECT</text>
+  <g transform="translate(912 77)">
+    <rect width="228" height="228" rx="58" fill="#142e3d" stroke="#365269"/>
+    <path d="M114 36L178 61V108C178 151 153 178 114 196C75 178 50 151 50 108V61Z" fill="none" stroke="url(#accent)" stroke-width="7"/>
+    <path d="M88 105H140M114 79V132" stroke="#c6f7ec" stroke-width="7" stroke-linecap="round"/>
+    <path d="M87 151H141" stroke="#78f0cf" stroke-width="7" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,10 @@
+{
+  "name": "DeckPort VPN",
+  "author": "DeckPort VPN contributors",
+  "flags": ["_root"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["network", "vpn", "root"],
+    "description": "Subscription-based system VPN in Gaming Mode."
+  }
+}
