@@ -64,6 +64,16 @@ bash install.sh
 You can also install the release ZIP using Decky's developer installation UI.
 No sing-box package installation or read-only filesystem changes are required.
 
+### Uninstall
+
+Disconnect the VPN first, then run this from Steam Deck Konsole:
+
+```bash
+sudo systemctl stop plugin_loader.service && sudo rm -rf "$HOME/homebrew/plugins/decky-vpn" && sudo systemctl start plugin_loader.service
+```
+
+This removes DeckPort VPN itself. Saved settings and installer backups are left untouched.
+
 ### Your first connection
 
 1. Open **Decky → DeckPort VPN**.
