@@ -279,4 +279,98 @@ Disconnect stops sing-box and removes DeckPort-owned TUN/routing state.
 - Local imports are restricted to DeckPort's dedicated import directory.
 - Latency probes reject private and non-global destinations.
 - There is currently **no kill switch**.
-- If
+- If the VPN core stops unexpectedly, DeckPort attempts to restore ordinary networking rather than intentionally leaving the Deck offline.
+
+Do not rely on the current preview as a fail-closed anonymity or censorship-resistance solution.
+
+## Development
+
+Requirements:
+
+- Node.js 22+
+- pnpm 9
+- Python 3.10+
+
+Install and test:
+
+```bash
+pnpm install --frozen-lockfile
+python scripts/fetch_deps.py
+pnpm typecheck
+pnpm build
+python -m unittest discover -s tests -v
+python scripts/check_core.py
+python scripts/package.py
+```
+
+The Python suite currently covers subscription parsing, installer behavior, backend lifecycle, RPC safety and local-file subscription import.
+
+Linux integration testing runs inside an isolated network namespace:
+
+```bash
+sudo unshare --net --mount --mount-proc python3 -u scripts/linux_smoke.py
+```
+
+The smoke test exercises real TCP traffic through the generated TUN, normal Disconnect and multiple process-cleanup scenarios.
+
+It deliberately refuses to run in the host network namespace.
+
+On Windows, use:
+
+```powershell
+python scripts/fetch_deps.py --windows-checker
+```
+
+before core validation where required.
+
+### pnpm note
+
+The GitHub Actions workflows already specify pnpm 9.
+
+Do not commit an automatically generated `packageManager` field to `package.json` while the workflow also supplies its own pnpm version, otherwise `pnpm/action-setup` will reject the duplicate version configuration.
+
+## Project status
+
+Completed:
+
+- [x] Subscription → server → system-wide TUN
+- [x] Gaming Mode connect / disconnect
+- [x] URL subscriptions over HTTPS
+- [x] URL subscriptions over HTTP
+- [x] Local subscription file import
+- [x] Safe local import directory
+- [x] Subscription refresh / reload
+- [x] Server search
+- [x] TCP endpoint latency checks
+- [x] Sort servers by latency or name
+- [x] Public IP before / after VPN
+- [x] Soft public-IP verification
+- [x] Backend-owned VPN state
+- [x] Crash cleanup
+- [x] Verified release installer
+- [x] Update backups and settings preservation
+
+Possible future work:
+
+- [ ] Favorites
+- [ ] Per-server automatic background latency refresh
+- [ ] Auto-connect
+- [ ] Retry / backoff
+- [ ] Better sleep / resume handling
+- [ ] Optional kill switch
+- [ ] Split tunneling
+- [ ] Broader provider and Steam Deck hardware validation
+
+## Credits & license
+
+Built using the official Decky plugin ecosystem and powered by sing-box.
+
+Independent project; not affiliated with Valve, Steam, Steam Deck Homebrew or SagerNet.
+
+Plugin code:
+
+[GPL-3.0-or-later](LICENSE)
+
+Third-party dependency notices and corresponding-source information:
+
+[THIRD_PARTY.md](THIRD_PARTY.md)
