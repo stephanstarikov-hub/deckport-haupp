@@ -73,12 +73,15 @@ class Parsers(unittest.TestCase):
                 parse(text, SID)
 
     def test_fetch_restricts_url(self):
-        for url in ("file:///etc/shadow", "http://example.com", "https://user:password@example.com", "https://example.com:8080", "https://example.com/\r\nCookie:x"):
+        for url in ("file:///etc/shadow", "ftp://example.com", "https://user:password@example.com", "https://example.com/\r\nCookie:x"):
             with self.assertRaises(VPNError):
                 validate_url(url)
         validate_url("https://example.com/sub/token")
+        validate_url("http://example.com/sub/token")
+        validate_url("http://example.com:8080/sub/token")
+        validate_url("https://example.com:8080/sub/token")
         with patch("socket.getaddrinfo", return_value=[(2, 1, 6, "", ("127.0.0.1", 443))]):
-            with self.assertRaisesRegex(VPNError, "public HTTPS"):
+            with self.assertRaisesRegex(VPNError, "public HTTP/HTTPS"):
                 download("https://example.com/token")
 
     def test_limits(self):

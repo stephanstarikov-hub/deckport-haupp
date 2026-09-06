@@ -10,24 +10,36 @@ from .parser import MAX_BYTES
 
 def validate_url(url):
     if not isinstance(url, str) or len(url) > 4096 or any(ord(c) < 33 for c in url):
-        raise VPNError("Enter a valid HTTPS subscription URL")
+        raise VPNError("Enter a valid HTTP/HTTPS subscription URL")
     try:
         u = urlsplit(url)
-        if u.scheme != "https" or not u.hostname or u.username or u.password or u.fragment or u.port not in (None, 443):
+        if u.scheme not in ("http", "https") or not u.hostname or u.username or u.password or u.fragment:
+            raise ValueError()
+        port = u.port
+        if port is not None and not (1 <= port <= 65535):
             raise ValueError()
     except ValueError:
-        raise VPNError("Enter a valid HTTPS subscription URL (port 443)") from None
+        raise VPNError("Enter a valid HTTP/HTTPS subscription URL") from None
     return u
 
 
+class PinnedHTTP(http.client.HTTPConnection):
+    def __init__(self, name, address, port, timeout):
+        super().__init__(name, port=port, timeout=timeout)
+        self.address = address
+
+    def connect(self):
+        self.sock = socket.create_connection((self.address, self.port), self.timeout)
+
+
 class PinnedHTTPS(http.client.HTTPSConnection):
-    def __init__(self, name, address, timeout):
-        super().__init__(name, timeout=timeout, context=ssl.create_default_context())
+    def __init__(self, name, address, port, timeout):
+        super().__init__(name, port=port, timeout=timeout, context=ssl.create_default_context())
         self.address = address
 
     def connect(self):
         # Connect to the validated IP, retaining TLS hostname verification/SNI.
-        sock = socket.create_connection((self.address, 443), self.timeout)
+        sock = socket.create_connection((self.address, self.port), self.timeout)
         try:
             self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
         except BaseException:
@@ -41,13 +53,17 @@ def download(url):
         u = validate_url(url)
         connection = None
         try:
-            ips = list(dict.fromkeys(r[4][0] for r in socket.getaddrinfo(u.hostname, 443, type=socket.SOCK_STREAM)))
+            port = u.port or (443 if u.scheme == "https" else 80)
+            ips = list(dict.fromkeys(r[4][0] for r in socket.getaddrinfo(u.hostname, port, type=socket.SOCK_STREAM)))
             if not ips or any(not ipaddress.ip_address(ip).is_global for ip in ips):
-                raise VPNError("Subscription must use a public HTTPS endpoint")
+                raise VPNError("Subscription must use a public HTTP/HTTPS endpoint")
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise TimeoutError()
-            connection = PinnedHTTPS(u.hostname, ips[0], min(10, remaining))
+            if u.scheme == "https":
+                connection = PinnedHTTPS(u.hostname, ips[0], port, min(10, remaining))
+            else:
+                connection = PinnedHTTP(u.hostname, ips[0], port, min(10, remaining))
             connection.request("GET", (u.path or "/") + ("?" + u.query if u.query else ""), headers={"User-Agent": "DeckyVPN/0.1", "Accept": "text/plain, application/json, application/yaml", "Accept-Encoding": "identity"})
             response = connection.getresponse()
             if response.status in (301, 302, 303, 307, 308):

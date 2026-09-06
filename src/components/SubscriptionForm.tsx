@@ -23,7 +23,7 @@ export function SubscriptionForm({ subscription, done, closeModal }: { subscript
     <DialogHeader>{subscription ? "Edit subscription" : "Add subscription"}</DialogHeader>
     <DialogBody>
       <TextField label="Name" value={name} onChange={e => setName(e.target.value)} disabled={busy} />
-      <TextField label="Subscription URL" description={subscription ? "Leave blank to keep the saved URL" : "HTTPS link from your VPN provider"} value={url} onChange={e => setURL(e.target.value)} bIsPassword disabled={busy} />
+      <TextField label="Subscription URL" description={subscription ? "Leave blank to keep the saved URL" : "HTTP or HTTPS link from your VPN provider"} value={url} onChange={e => setURL(e.target.value)} bIsPassword disabled={busy} />
       {error && <p role="alert" style={{ color: "#ffb2ac" }}>{error}</p>}
       {busy && <p>Downloading and checking servers…</p>}
       <Focusable style={{ display: "flex", gap: 12 }}>
