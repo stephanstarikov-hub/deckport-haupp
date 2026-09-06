@@ -58,9 +58,9 @@ def build(windows=False):
         (licenses / "sing-box-LICENSE").write_bytes(tar.extractfile(f"sing-box-{VERSION}/LICENSE").read())
     template = download("https://raw.githubusercontent.com/SteamDeckHomebrew/decky-plugin-template/90d0780e882a17f5714fc6de044c645f22608290/LICENSE", "template-LICENSE")
     (licenses / "template-LICENSE").write_bytes(template.read_bytes())
-    # Preserve full GPL text and upstream additional naming condition separately.
-    gpl = download("https://www.gnu.org/licenses/gpl-3.0.txt", "GPL-3.0.txt")
-    (ROOT / "LICENSE").write_bytes(gpl.read_bytes())
+    license_path = ROOT / "LICENSE"
+    if not license_path.is_file():
+        raise RuntimeError("Missing LICENSE: commit the plugin GPL-3.0-or-later text in the repo")
     if windows:
         filename, checksum = ASSETS["windows"]
         archive = download(f"https://github.com/SagerNet/sing-box/releases/download/v{VERSION}/{filename}", filename, checksum)
