@@ -54,6 +54,12 @@ class Plugin:
     async def ping_servers(self, subscription_id):
         return await self._rpc("ping_servers", subscription_id)
 
+    async def get_import_files(self):
+        return await self._rpc("import_files")
+
+    async def import_subscription_file(self, filename, name):
+        return await self._rpc("import_subscription", filename, name)
+
     async def add_subscription(self, url, name):
         return await self._rpc("add_or_update", url, name)
 

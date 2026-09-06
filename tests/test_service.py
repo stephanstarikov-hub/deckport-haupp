@@ -71,6 +71,100 @@ class Lifecycle(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(VPNError):
             await self.service.add_or_update("https://example.com", "https://token")
 
+
+    async def test_local_subscription_import(self):
+        path = self.service.import_dir / "local.txt"
+        path.write_text(URI, encoding="utf-8")
+
+        result = await self.service.import_subscription(
+            "local.txt",
+            "Local VPN",
+        )
+
+        self.assertEqual(result["count"], 1)
+
+        subscription = next(
+            s
+            for s in self.service.store.data["subscriptions"]
+            if s["id"] == result["id"]
+        )
+
+        self.assertEqual(subscription["source_type"], "file")
+        self.assertEqual(subscription["source"], "local.txt")
+        self.assertEqual(subscription["name"], "Local VPN")
+
+        public = next(
+            s
+            for s in self.service.subscriptions()
+            if s["id"] == result["id"]
+        )
+
+        self.assertEqual(public["source_type"], "file")
+        self.assertEqual(public["source_label"], "local.txt")
+        self.assertNotIn("url", public)
+
+    async def test_local_import_rejects_unsafe_paths_and_extensions(self):
+        for filename in (
+            "../evil.txt",
+            "..\\evil.txt",
+            "/etc/passwd",
+            "evil.exe",
+            "nested/file.txt",
+        ):
+            with self.assertRaises(VPNError):
+                await self.service.import_subscription(
+                    filename,
+                    "Unsafe",
+                )
+
+    async def test_local_import_file_listing(self):
+        good = self.service.import_dir / "provider.yaml"
+        good.write_text(URI, encoding="utf-8")
+
+        ignored = self.service.import_dir / "ignore.exe"
+        ignored.write_text(URI, encoding="utf-8")
+
+        files = self.service.import_files()
+        names = [item["name"] for item in files]
+
+        self.assertIn("provider.yaml", names)
+        self.assertNotIn("ignore.exe", names)
+
+    async def test_local_subscription_refresh_reloads_same_file(self):
+        path = self.service.import_dir / "reload.txt"
+        path.write_text(URI, encoding="utf-8")
+
+        result = await self.service.import_subscription(
+            "reload.txt",
+            "Reload VPN",
+        )
+
+        identifier = result["id"]
+
+        original = self.service.find_subscription(identifier)
+        original_node = original["nodes"][0]["id"]
+
+        replacement = (
+            "vless://22222222-2222-4222-8222-222222222222"
+            "@203.0.113.2:443?security=tls&sni=example.org#Reloaded"
+        )
+
+        path.write_text(replacement, encoding="utf-8")
+
+        refreshed = await self.service.refresh(identifier)
+
+        self.assertEqual(refreshed["id"], identifier)
+        self.assertEqual(refreshed["count"], 1)
+
+        updated = self.service.find_subscription(identifier)
+
+        self.assertEqual(updated["source_type"], "file")
+        self.assertEqual(updated["source"], "reload.txt")
+        self.assertNotEqual(
+            updated["nodes"][0]["id"],
+            original_node,
+        )
+
     async def test_connected_requires_route_and_live_process(self):
         async def start(_):
             self.service.core.alive = True

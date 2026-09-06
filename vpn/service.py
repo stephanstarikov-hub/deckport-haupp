@@ -23,6 +23,8 @@ class Service:
         for p in (settings, runtime, logs):
             private_dir(p)
         self.store = Store(settings / "subscriptions.json")
+        self.import_dir = settings / "import"
+        private_dir(self.import_dir)
         self.runtime, self.logs, self.emit = runtime, logs, emit
         self.core = Core(root, runtime)
         self.state = {"state": "DISCONNECTED", "server": None, "selected": self.store.data["selected"], "error": None, "before_ip": None, "public_ip": None, "verification": None, "since": None}
@@ -64,7 +66,161 @@ class Service:
         return result
 
     def subscriptions(self):
-        return [{"id": s["id"], "name": s["name"], "count": len(s["nodes"]), "updated": s["updated"], "metadata": s["metadata"], "skipped": s["skipped"]} for s in self.store.data["subscriptions"]]
+        return [{
+            "id": s["id"],
+            "name": s["name"],
+            "count": len(s["nodes"]),
+            "updated": s["updated"],
+            "metadata": s["metadata"],
+            "skipped": s["skipped"],
+            "source_type": s.get("source_type", "url"),
+            "source_label": s.get("source") if s.get("source_type") == "file" else "URL",
+        } for s in self.store.data["subscriptions"]]
+
+    @staticmethod
+    def validate_import_filename(filename):
+        if (
+            not isinstance(filename, str)
+            or not 1 <= len(filename) <= 160
+            or filename != Path(filename).name
+            or "/" in filename
+            or "\\" in filename
+            or any(ord(c) < 32 for c in filename)
+        ):
+            raise VPNError("Invalid import filename")
+
+        if Path(filename).suffix.lower() not in (
+            ".txt", ".conf", ".json", ".yaml", ".yml"
+        ):
+            raise VPNError("Unsupported subscription file type")
+
+        return filename
+
+    def import_files(self):
+        files = []
+
+        for path in self.import_dir.iterdir():
+            try:
+                if path.is_symlink() or not path.is_file():
+                    continue
+
+                self.validate_import_filename(path.name)
+
+                stat = path.stat()
+                if stat.st_size > 8 * 1024 * 1024:
+                    continue
+
+                files.append({
+                    "name": path.name,
+                    "size": stat.st_size,
+                    "modified": int(stat.st_mtime),
+                })
+            except (OSError, VPNError):
+                continue
+
+        files.sort(key=lambda item: item["name"].lower())
+        return files
+
+    def read_import_file(self, filename):
+        filename = self.validate_import_filename(filename)
+        path = self.import_dir / filename
+
+        if not path.exists() or path.is_symlink() or not path.is_file():
+            raise VPNError("Import file not found")
+
+        if path.stat().st_size > 8 * 1024 * 1024:
+            raise VPNError("Subscription file is too large")
+
+        try:
+            return path.read_text(encoding="utf-8-sig")
+        except UnicodeDecodeError:
+            raise VPNError("Subscription file must be UTF-8 text") from None
+
+    async def import_subscription(self, filename, name=None, identifier=None):
+        filename = self.validate_import_filename(filename)
+
+        if name is None or not str(name).strip():
+            name = Path(filename).stem
+
+        if (
+            not isinstance(name, str)
+            or not 1 <= len(name.strip()) <= 80
+            or any(ord(c) < 32 for c in name)
+        ):
+            raise VPNError("Subscription name must contain 180 characters")
+
+        editing = identifier is not None
+
+        if identifier:
+            self.find_subscription(identifier)
+        elif len(self.store.data["subscriptions"]) >= 30:
+            raise VPNError("Subscription limit reached (30)")
+
+        identifier = identifier or uuid.uuid4().hex
+
+        try:
+            raw = await asyncio.wait_for(
+                asyncio.to_thread(self.read_import_file, filename),
+                5,
+            )
+            nodes, skipped = await asyncio.wait_for(
+                asyncio.to_thread(parse, raw, identifier),
+                10,
+            )
+        except asyncio.TimeoutError:
+            raise VPNError("Subscription file parsing timed out") from None
+
+        async with self.lock:
+            old = next(
+                (
+                    s for s in self.store.data["subscriptions"]
+                    if s["id"] == identifier
+                ),
+                None,
+            )
+
+            if editing and old is None:
+                raise VPNError("Subscription was deleted while importing")
+
+            if old:
+                self.store.data["subscriptions"].remove(old)
+
+            record = {
+                "id": identifier,
+                "name": name.strip(),
+                "source_type": "file",
+                "source": filename,
+                "nodes": nodes,
+                "skipped": skipped,
+                "metadata": {},
+                "updated": int(time.time()),
+            }
+
+            self.store.data["subscriptions"].append(record)
+
+            if self.store.data["selected"] is None:
+                self.store.data["selected"] = nodes[0]["id"]
+            elif (
+                old
+                and any(
+                    n["id"] == self.store.data["selected"]
+                    for n in old["nodes"]
+                )
+                and not any(
+                    n["id"] == self.store.data["selected"]
+                    for n in nodes
+                )
+            ):
+                self.store.data["selected"] = nodes[0]["id"]
+
+            self.store.save()
+            self.state["selected"] = self.store.data["selected"]
+
+        return {
+            "id": identifier,
+            "count": len(nodes),
+            "skipped": skipped,
+        }
 
     def find_subscription(self, identifier):
         self.validate_id(identifier)
@@ -198,7 +354,17 @@ class Service:
                 raise VPNError("Subscription was deleted while downloading")
             if old:
                 self.store.data["subscriptions"].remove(old)
-            record = {"id": identifier, "name": name.strip(), "url": url, "nodes": nodes, "skipped": skipped, "metadata": metadata, "updated": int(time.time())}
+            record = {
+                "id": identifier,
+                "name": name.strip(),
+                "source_type": "url",
+                "source": url,
+                "url": url,
+                "nodes": nodes,
+                "skipped": skipped,
+                "metadata": metadata,
+                "updated": int(time.time()),
+            }
             self.store.data["subscriptions"].append(record)
             if self.store.data["selected"] is None:
                 self.store.data["selected"] = nodes[0]["id"]
@@ -210,7 +376,19 @@ class Service:
 
     async def refresh(self, identifier):
         s = self.find_subscription(identifier)
-        return await self.add_or_update(s["url"], s["name"], identifier)
+
+        if s.get("source_type") == "file":
+            return await self.import_subscription(
+                s["source"],
+                s["name"],
+                identifier,
+            )
+
+        return await self.add_or_update(
+            s["url"],
+            s["name"],
+            identifier,
+        )
 
     async def edit(self, identifier, name, url):
         s = self.find_subscription(identifier)
@@ -352,7 +530,7 @@ class Service:
 
     def diagnostic(self):
         # Deliberately omit server/provider labels, host, URL, keys and raw core output.
-        return json.dumps({"plugin": "0.1.2", "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
+        return json.dumps({"plugin": "0.1.3", "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
 
     def get_logs(self):
         return (self.logs / "plugin.log").read_text(encoding="utf-8")[-12000:]

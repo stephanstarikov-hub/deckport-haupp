@@ -6,7 +6,27 @@ export type PingResult = {
   status: "ok" | "timeout" | "unsupported" | "blocked";
   latency_ms: number | null;
 };
-export type Subscription = { id: string; name: string; count: number; updated: number; skipped: number; metadata: { upload?: number; download?: number; total?: number; expire?: number } };
+export type Subscription = {
+  id: string;
+  name: string;
+  count: number;
+  updated: number;
+  skipped: number;
+  source_type: "url" | "file";
+  source_label: string;
+  metadata: {
+    upload?: number;
+    download?: number;
+    total?: number;
+    expire?: number;
+  };
+};
+
+export type ImportFile = {
+  name: string;
+  size: number;
+  modified: number;
+};
 export type Status = { state: "DISCONNECTED" | "CONNECTING" | "CONNECTED" | "RECONNECTING" | "DISCONNECTING" | "ERROR"; server: Node | null; selected: string | null; selected_server: Node | null; selected_subscription: string | null; error: string | null; before_ip: string | null; public_ip: string | null; verification: "verified" | "same_ip" | "unavailable" | null; since: number | null };
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 function rpc<A extends unknown[], T>(name: string) {
@@ -24,6 +44,8 @@ export const api = {
   subscriptions: rpc<[], Subscription[]>("get_subscriptions"),
   servers: rpc<[string], Node[]>("get_servers"),
   pings: rpc<[string], PingResult[]>("ping_servers"),
+  importFiles: rpc<[], ImportFile[]>("get_import_files"),
+  importFile: rpc<[string, string], { id: string; count: number; skipped: number }>("import_subscription_file"),
   add: rpc<[string, string], { id: string; count: number; skipped: number }>("add_subscription"),
   refresh: rpc<[string], unknown>("update_subscription"),
   edit: rpc<[string, string, string], unknown>("edit_subscription"),
