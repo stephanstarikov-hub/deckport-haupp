@@ -163,12 +163,36 @@ class Service:
                 asyncio.to_thread(self.read_import_file, filename),
                 5,
             )
+
+            candidate = raw.strip()
+            metadata = {}
+
+            # A local import file may contain either the subscription itself
+            # or a single HTTP/HTTPS subscription URL.
+            if (
+                candidate.startswith(("http://", "https://"))
+                and "\n" not in candidate
+                and "\r" not in candidate
+            ):
+                validate_url(candidate)
+
+                if self.download_lock.locked():
+                    raise VPNError("A subscription download is already running")
+
+                async with self.download_lock:
+                    raw, metadata = await asyncio.wait_for(
+                        asyncio.to_thread(download, candidate),
+                        30,
+                    )
+
             nodes, skipped = await asyncio.wait_for(
                 asyncio.to_thread(parse, raw, identifier),
                 10,
             )
         except asyncio.TimeoutError:
-            raise VPNError("Subscription file parsing timed out") from None
+            raise VPNError(
+                "Subscription file download or parsing timed out"
+            ) from None
 
         async with self.lock:
             old = next(
@@ -192,7 +216,7 @@ class Service:
                 "source": filename,
                 "nodes": nodes,
                 "skipped": skipped,
-                "metadata": {},
+                "metadata": metadata,
                 "updated": int(time.time()),
             }
 
@@ -435,7 +459,22 @@ class Service:
             await self.core.start(config)
             if not await self.core.route_verified():
                 raise VPNError("System traffic is not routed through the VPN interface")
-            after = await public_ip()
+            after = None
+
+            # Routing may be ready slightly before existing sockets/DNS paths
+            # fully settle. Retry public-IP verification briefly so we do not
+            # report "same IP" just because the first probe was too early.
+            for delay in (0, 0.75, 1.25):
+                if delay:
+                    await asyncio.sleep(delay)
+
+                if not self.core.alive:
+                    break
+
+                after = await public_ip()
+
+                if after and (not before or after != before):
+                    break
 
             # The VPN core/TUN must remain alive. Public-IP verification is
             # informational and must never tear down an otherwise working VPN.
@@ -530,7 +569,7 @@ class Service:
 
     def diagnostic(self):
         # Deliberately omit server/provider labels, host, URL, keys and raw core output.
-        return json.dumps({"plugin": "0.1.3", "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
+        return json.dumps({"plugin": "0.1.4", "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
 
     def get_logs(self):
         return (self.logs / "plugin.log").read_text(encoding="utf-8")[-12000:]

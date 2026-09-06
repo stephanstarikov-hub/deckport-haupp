@@ -165,6 +165,79 @@ class Lifecycle(unittest.IsolatedAsyncioTestCase):
             original_node,
         )
 
+
+    async def test_local_file_can_contain_subscription_url(self):
+        path = self.service.import_dir / "provider.txt"
+        path.write_text(
+            "http://example.com/subscription",
+            encoding="utf-8",
+        )
+
+        with patch(
+            "vpn.service.download",
+            return_value=(URI, {"total": 12345}),
+        ) as mocked:
+            result = await self.service.import_subscription(
+                "provider.txt",
+                "Provider file",
+            )
+
+        self.assertEqual(result["count"], 1)
+        mocked.assert_called_once_with(
+            "http://example.com/subscription"
+        )
+
+        subscription = self.service.find_subscription(
+            result["id"]
+        )
+
+        self.assertEqual(
+            subscription["source_type"],
+            "file",
+        )
+        self.assertEqual(
+            subscription["source"],
+            "provider.txt",
+        )
+        self.assertEqual(
+            subscription["metadata"]["total"],
+            12345,
+        )
+
+    async def test_connect_retries_public_ip_until_changed(self):
+        self.service.core.alive = False
+
+        async def start(_):
+            self.service.core.alive = True
+
+        self.service.core.start.side_effect = start
+
+        with (
+            patch(
+                "vpn.service.public_ip",
+                AsyncMock(
+                    side_effect=[
+                        "1.1.1.1",
+                        "1.1.1.1",
+                        "2.2.2.2",
+                    ]
+                ),
+            ),
+            patch(
+                "vpn.service.asyncio.sleep",
+                AsyncMock(),
+            ),
+        ):
+            await self.service.connect(self.node)
+            await self.service.task
+
+        state = self.service.status()
+
+        self.assertEqual(state["state"], "CONNECTED")
+        self.assertEqual(state["before_ip"], "1.1.1.1")
+        self.assertEqual(state["public_ip"], "2.2.2.2")
+        self.assertEqual(state["verification"], "verified")
+
     async def test_connected_requires_route_and_live_process(self):
         async def start(_):
             self.service.core.alive = True
