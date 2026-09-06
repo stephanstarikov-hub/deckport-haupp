@@ -8,7 +8,7 @@ ENDPOINTS = ["https://api.ipify.org/", "https://icanhazip.com/", "https://checki
 
 
 def _request(host, address):
-    connection = PinnedHTTPS(host, address, 4)
+    connection = PinnedHTTPS(host, address, 443, 4)
     try:
         connection.request("GET", "/", headers={"User-Agent": "DeckyVPN/0.1"})
         r = connection.getresponse()

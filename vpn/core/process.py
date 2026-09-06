@@ -111,14 +111,6 @@ class Core:
         self.config.unlink(missing_ok=True)
 
     async def route_verified(self):
-        p = await asyncio.create_subprocess_exec("ip", "-j", "route", "get", "1.1.1.1", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
-        try:
-            output, _ = await asyncio.wait_for(p.communicate(), 3)
-            import json
-            return p.returncode == 0 and any(r.get("dev") == TUN for r in json.loads(output))
-        except asyncio.TimeoutError:
-            p.kill()
-            await p.wait()
-            return False
-        except (ValueError, TypeError):
-            return False
+        # auto_redirect routes Linux traffic through nftables, so
+        # `ip route get` does not have to report deckyvpn0 directly.
+        return self.alive and Path("/sys/class/net/" + TUN).exists()

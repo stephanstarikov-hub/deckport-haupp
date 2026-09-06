@@ -43,7 +43,7 @@ def extract(archive, staging):
         if not {PREFIX + n for n in REQUIRED}.issubset(seen):
             raise ValueError("Incomplete plugin release")
         manifest = json.loads(zipped.read(PREFIX + "plugin.json"))
-        if manifest.get("name") != "DeckPort VPN" or manifest.get("flags") != ["_root"]:
+        if manifest.get("name") != "DeckPort VPN" or manifest.get("flags") != ["root"]:
             raise ValueError("Unexpected plugin manifest")
         if zipped.read(PREFIX + "backend/bin/sing-box")[:4] != b"\x7fELF":
             raise ValueError("Linux core missing")

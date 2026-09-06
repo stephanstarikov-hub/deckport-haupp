@@ -2,6 +2,8 @@ import asyncio
 import copy
 import json
 import logging
+import ipaddress
+import socket
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import time
@@ -23,7 +25,7 @@ class Service:
         self.store = Store(settings / "subscriptions.json")
         self.runtime, self.logs, self.emit = runtime, logs, emit
         self.core = Core(root, runtime)
-        self.state = {"state": "DISCONNECTED", "server": None, "selected": self.store.data["selected"], "error": None, "before_ip": None, "public_ip": None, "since": None}
+        self.state = {"state": "DISCONNECTED", "server": None, "selected": self.store.data["selected"], "error": None, "before_ip": None, "public_ip": None, "verification": None, "since": None}
         self.lock = asyncio.Lock()
         self.download_lock = asyncio.Lock()
         self.task = None
@@ -86,6 +88,90 @@ class Service:
 
     def servers(self, subscription_id):
         return [public_node(n) for n in self.find_subscription(subscription_id)["nodes"]]
+
+    async def ping_servers(self, subscription_id):
+        subscription = self.find_subscription(subscription_id)
+        semaphore = asyncio.Semaphore(16)
+
+        async def probe(node):
+            # WireGuard endpoints are UDP; TCP latency would be misleading.
+            if node["protocol"] == "wireguard":
+                return {
+                    "id": node["id"],
+                    "status": "unsupported",
+                    "latency_ms": None,
+                }
+
+            raw = node["raw_config"]
+            host = raw.get("server")
+            port = raw.get("server_port")
+
+            async with semaphore:
+                try:
+                    loop = asyncio.get_running_loop()
+
+                    answers = await asyncio.wait_for(
+                        loop.getaddrinfo(
+                            host,
+                            port,
+                            type=socket.SOCK_STREAM,
+                        ),
+                        2.0,
+                    )
+
+                    addresses = list(
+                        dict.fromkeys(answer[4][0] for answer in answers)
+                    )
+
+                    if not addresses:
+                        raise OSError()
+
+                    # Subscription data must never be usable to scan localhost/LAN.
+                    if any(
+                        not ipaddress.ip_address(address).is_global
+                        for address in addresses
+                    ):
+                        return {
+                            "id": node["id"],
+                            "status": "blocked",
+                            "latency_ms": None,
+                        }
+
+                    started = time.perf_counter()
+
+                    reader, writer = await asyncio.wait_for(
+                        asyncio.open_connection(addresses[0], port),
+                        2.5,
+                    )
+
+                    latency = max(
+                        1,
+                        round((time.perf_counter() - started) * 1000),
+                    )
+
+                    writer.close()
+
+                    try:
+                        await writer.wait_closed()
+                    except Exception:
+                        pass
+
+                    return {
+                        "id": node["id"],
+                        "status": "ok",
+                        "latency_ms": latency,
+                    }
+
+                except Exception:
+                    return {
+                        "id": node["id"],
+                        "status": "timeout",
+                        "latency_ms": None,
+                    }
+
+        return await asyncio.gather(
+            *(probe(node) for node in subscription["nodes"])
+        )
 
     async def add_or_update(self, url, name, identifier=None):
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 80 or any(ord(c) < 32 for c in name) or "://" in name:
@@ -158,7 +244,7 @@ class Service:
                 raise VPNError("A VPN operation is already running")
             n = copy.deepcopy(self.find_node(identifier))
             await self.select(identifier)
-            await self.set_state("CONNECTING", server=public_node(n), error=None, public_ip=None, since=None)
+            await self.set_state("CONNECTING", server=public_node(n), error=None, public_ip=None, verification=None, since=None)
             self.task = asyncio.create_task(self.run_connection(n))
         return self.status()
 
@@ -172,16 +258,28 @@ class Service:
             if not await self.core.route_verified():
                 raise VPNError("System traffic is not routed through the VPN interface")
             after = await public_ip()
-            if not after:
-                # Try alternate DNS resolver, still exclusively through VPN.
-                await self.core.stop()
-                config["dns"]["final"] = "dns-secondary"
-                config["route"]["default_domain_resolver"] = "dns-secondary"
-                await self.core.start(config)
-                after = await public_ip()
-            if not after or not self.core.alive or not await self.core.route_verified():
-                raise VPNError("Connection timed out: tunnel traffic or DNS verification failed")
-            await self.set_state("CONNECTED", public_ip=after, since=int(time.time()), error=None)
+
+            # The VPN core/TUN must remain alive. Public-IP verification is
+            # informational and must never tear down an otherwise working VPN.
+            if not self.core.alive or not await self.core.route_verified():
+                raise VPNError("VPN tunnel stopped before connection completed")
+
+            if after:
+                verification = (
+                    "same_ip"
+                    if before and before == after
+                    else "verified"
+                )
+            else:
+                verification = "unavailable"
+
+            await self.set_state(
+                "CONNECTED",
+                public_ip=after,
+                verification=verification,
+                since=int(time.time()),
+                error=None,
+            )
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -203,7 +301,7 @@ class Service:
             except VPNError as e:
                 await self.set_state("ERROR", error=str(e))
                 return self.status()
-            await self.set_state("DISCONNECTED", server=None, error=None, public_ip=None, since=None)
+            await self.set_state("DISCONNECTED", server=None, error=None, public_ip=None, verification=None, since=None)
             return self.status()
 
     async def watch(self):
@@ -227,14 +325,34 @@ class Service:
         if self.state["state"] != "CONNECTED":
             raise VPNError("Connect before verifying the tunnel")
         ip = await public_ip()
-        verified = self.core.alive and await self.core.route_verified() and bool(ip)
+        tunnel_ok = self.core.alive and await self.core.route_verified()
+        verified = tunnel_ok and bool(ip)
+        changed = bool(
+            ip
+            and self.state.get("before_ip")
+            and ip != self.state["before_ip"]
+        )
+
         if self.state["state"] == "CONNECTED":
             self.state["public_ip"] = ip
-        return {"verified": verified, "public_ip": ip}
+            self.state["verification"] = (
+                "verified"
+                if changed
+                else "same_ip"
+                if ip
+                else "unavailable"
+            )
+
+        return {
+            "verified": verified,
+            "tunnel_ok": tunnel_ok,
+            "public_ip": ip,
+            "changed": changed,
+        }
 
     def diagnostic(self):
         # Deliberately omit server/provider labels, host, URL, keys and raw core output.
-        return json.dumps({"plugin": "0.1.1", "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
+        return json.dumps({"plugin": "0.1.2", "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
 
     def get_logs(self):
         return (self.logs / "plugin.log").read_text(encoding="utf-8")[-12000:]

@@ -1,7 +1,7 @@
 {
   "name": "DeckPort VPN",
   "author": "DeckPort VPN contributors",
-  "flags": ["_root"],
+  "flags": ["root"],
   "api_version": 1,
   "publish": {
     "tags": ["network", "vpn", "root"],

@@ -25,7 +25,7 @@ class Installer(unittest.TestCase):
             for name in REQUIRED:
                 content = b"synthetic"
                 if name == "plugin.json":
-                    content = json.dumps({"name": "DeckPort VPN", "flags": ["_root"]}).encode()
+                    content = json.dumps({"name": "DeckPort VPN", "flags": ["root"]}).encode()
                 elif name == "backend/bin/sing-box":
                     content = b"\x7fELFsynthetic"
                 z.writestr("decky-vpn/" + name, content)

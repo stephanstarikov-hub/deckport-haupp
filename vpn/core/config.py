@@ -34,7 +34,7 @@ async def generate(raw):
         ], "final": "dns-primary", "strategy": "prefer_ipv4"},
         "inbounds": [{"type": "tun", "tag": "tun", "interface_name": TUN,
                       "address": ["172.29.253.1/30", "fd72:6465:636b::1/126"],
-                      "mtu": 1280, "auto_route": True, "auto_redirect": False,
+                      "mtu": 1280, "auto_route": True, "auto_redirect": True,
                       "strict_route": True, "dns_mode": "hijack",
                       "iproute2_table_index": TABLE, "iproute2_rule_index": RULE,
                       "stack": "mixed"}],
