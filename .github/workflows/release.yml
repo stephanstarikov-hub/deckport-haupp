@@ -29,7 +29,7 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - run: bash -n install.sh
       - run: python scripts/check_core.py
-      - run: sudo unshare --net --mount-proc python3 -u scripts/linux_smoke.py
+      - run: sudo unshare --net --mount --mount-proc python3 -u scripts/linux_smoke.py
       - run: python scripts/package.py
       - name: Publish binaries, checksums and corresponding source
         env:

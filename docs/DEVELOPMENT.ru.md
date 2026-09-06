@@ -110,7 +110,7 @@ python scripts/package.py
 при сборке, никогда из подписки и никогда при Connect.
 
 ```sh
-sudo unshare --net --mount-proc python3 -u scripts/linux_smoke.py
+sudo unshare --net --mount --mount-proc python3 -u scripts/linux_smoke.py
 ```
 
 Тест отказывается работать в host network/mount namespace. Создаёт локальный

@@ -1,6 +1,6 @@
 """Real TUN/traffic/cleanup tests, only in a disposable network namespace.
 
-Run: sudo unshare --net --mount-proc python3 scripts/linux_smoke.py
+Run: sudo unshare --net --mount --mount-proc python3 scripts/linux_smoke.py
 No rules, interfaces or routes are installed in the host network namespace.
 """
 import asyncio
@@ -65,7 +65,7 @@ def clean_assert():
 
 async def main():
     if os.geteuid() != 0 or os.readlink("/proc/self/ns/net") == os.readlink("/proc/1/ns/net"):
-        raise SystemExit("Refusing host network namespace; run with sudo unshare --net --mount-proc")
+        raise SystemExit("Refusing host network namespace; run with sudo unshare --net --mount --mount-proc")
     if os.readlink("/proc/self/ns/mnt") == os.readlink("/proc/1/ns/mnt"):
         raise SystemExit("Refusing host mount namespace")
     # sysfs must reflect this network namespace rather than the inherited host view.

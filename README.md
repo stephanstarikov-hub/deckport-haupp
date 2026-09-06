@@ -137,7 +137,7 @@ On Windows, run `python scripts/fetch_deps.py --windows-checker` before core
 validation. Linux integration testing uses an isolated network namespace:
 
 ```bash
-sudo unshare --net --mount-proc python3 -u scripts/linux_smoke.py
+sudo unshare --net --mount --mount-proc python3 -u scripts/linux_smoke.py
 ```
 
 This tests actual TCP traffic through TUN, Disconnect, core exit, backend-pipe
