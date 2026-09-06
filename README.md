@@ -6,16 +6,18 @@
   <img alt="Platform: Steam Deck" src="https://img.shields.io/badge/Steam_Deck-Gaming_Mode-65dcb9?style=flat-square&amp;labelColor=0d1929" />
   <img alt="Core: sing-box 1.14.0" src="https://img.shields.io/badge/sing--box-1.14.0-71bfff?style=flat-square&amp;labelColor=0d1929" />
   <img alt="License: GPL 3.0 or later" src="https://img.shields.io/badge/license-GPL--3.0+-71bfff?style=flat-square&amp;labelColor=0d1929" />
-  <img alt="Status: hardware testing pending" src="https://img.shields.io/badge/status-MVP_preview-eec67a?style=flat-square&amp;labelColor=0d1929" />
+  <img alt="Status: preview" src="https://img.shields.io/badge/status-preview-eec67a?style=flat-square&amp;labelColor=0d1929" />
 </p>
 
 <p align="center">
-  A subscription-based VPN for Steam Deck, right inside Decky Loader.<br />
-  <strong>Add your subscription. Pick a server. Play.</strong>
+  A system-wide subscription VPN for Steam Deck, built directly into Decky Loader.<br />
+  <strong>Add a subscription. Find the fastest server. Connect. Play.</strong>
 </p>
 
 <p align="center">
   <a href="#install">Install</a> ·
+  <a href="#subscriptions">Subscriptions</a> ·
+  <a href="#servers--latency">Servers</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#development">Development</a> ·
   <a href="docs/DEVELOPMENT.ru.md">Документация на русском</a>
@@ -23,152 +25,258 @@
 
 ---
 
-## Stay in Gaming Mode
+## VPN without leaving Gaming Mode
 
-DeckPort puts your VPN subscription, server selection and connection controls
-in the Steam Deck Quick Access Menu. The tunnel lives in the backend, so you
-can close the menu and launch a game while it keeps running.
+DeckPort VPN puts connection control, subscriptions, server selection, latency checks and public-IP verification inside the Steam Deck Quick Access Menu.
 
-| Built for everyday use | Built with a real tunnel |
+Once connected, the tunnel lives in the backend. You can close Decky, launch a game and continue using the VPN system-wide.
+
+| Everyday use | Networking |
 | :--- | :--- |
-| Add, refresh and edit subscriptions | System-wide IPv4/IPv6 TUN via sing-box |
-| Search servers and remember your choice | DNS through the selected VPN |
-| Connect and disconnect from Decky | Backend-owned connection state |
-| View subscription usage and expiry | Process monitoring and crash cleanup |
-| Verify your public IP before and after | Bundled core — no pacman setup |
+| VPN / Servers / Subscriptions interface | System-wide TUN powered by sing-box |
+| URL and local-file subscriptions | IPv4 and IPv6 tunnel support |
+| Search and select servers | DNS routed through the VPN |
+| Ping all TCP-based servers | Backend-owned connection state |
+| Sort servers by latency or name | Process monitoring and crash cleanup |
+| View usage and expiry metadata | Bundled sing-box core |
+| Public IP before and after VPN | No pacman or read-only SteamOS changes |
 
-> **MVP preview.** Real TUN traffic and cleanup have been tested in an isolated
-> Linux network. Steam Deck LCD/OLED, gamepad interaction, provider compatibility
-> and SteamOS DNS/IPv6 leak testing still need hardware validation.
+> **Preview software.** DeckPort has automated parser, installer, core configuration,
+> lifecycle and isolated Linux TUN tests. Provider behavior, SteamOS releases,
+> individual games and unusual network environments can still expose edge cases.
 
 ## Install
 
-Requires an existing [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader)
-installation on SteamOS x86_64. Run the installer once from Konsole; afterwards,
-the normal subscription → server → Connect flow stays in Gaming Mode.
+Requires:
+
+- Steam Deck / SteamOS x86_64
+- Decky Loader
+- internet access for the initial installation
+
+Run once from Konsole:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-vpn/main/install.sh | bash
 ```
 
-The installer downloads a versioned release, checks its SHA-256, validates the
-archive, and asks for sudo only to install it. Updating keeps a backup and
-preserves subscriptions. Decky restarts briefly, disconnecting any active VPN.
+After installation, normal VPN use stays inside Gaming Mode.
 
-Prefer to inspect first? Download [install.sh](install.sh), read it, then run:
+The installer:
+
+- downloads a versioned GitHub release;
+- verifies its SHA-256 checksum;
+- validates the archive before extraction;
+- requests sudo only for installation;
+- preserves saved subscriptions and settings during updates;
+- keeps an installer backup of the previous plugin.
+
+Decky Loader restarts briefly during installation or update, so an active VPN connection will be interrupted.
+
+Prefer to inspect the installer first?
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-vpn/main/install.sh -o install.sh
+less install.sh
 bash install.sh
 ```
 
-You can also install the release ZIP using Decky's developer installation UI.
-No sing-box package installation or read-only filesystem changes are required.
+No system sing-box package and no SteamOS read-only filesystem modifications are required.
 
 ### Uninstall
 
-Disconnect the VPN first, then run this from Steam Deck Konsole:
+Disconnect the VPN first, then run:
 
 ```bash
-sudo systemctl stop plugin_loader.service && sudo rm -rf "$HOME/homebrew/plugins/decky-vpn" && sudo systemctl start plugin_loader.service
+sudo systemctl stop plugin_loader.service
+sudo rm -rf "$HOME/homebrew/plugins/decky-vpn"
+sudo systemctl start plugin_loader.service
 ```
 
-This removes DeckPort VPN itself. Saved settings and installer backups are left untouched.
+Saved DeckPort settings and installer backups are intentionally left untouched.
 
-### Your first connection
+## First connection
 
 1. Open **Decky → DeckPort VPN**.
-2. Choose **+ Add subscription**, enter a name and your provider's HTTPS URL.
-3. Open **Server**, pick a node, then press **Connect**.
-4. Wait for **CONNECTED**, close Quick Access and launch your game.
-5. Return to DeckPort and press **Disconnect** when finished.
+2. Open **Subs**.
+3. Add a provider URL or import a local subscription file.
+4. Open **Servers**.
+5. Optionally press **Ping all servers** and sort by **Fastest**.
+6. Select a server.
+7. Return to **VPN** and press **Connect VPN**.
+8. Wait for **CONNECTED**.
+9. Close Quick Access and launch your game.
 
-## Bring your subscription
+The VPN page shows:
 
-**Protocols:** VLESS · VMess · Trojan · Shadowsocks · SOCKS5 · WireGuard.
+- selected server and protocol;
+- connection state;
+- latency when measured;
+- public IP before VPN;
+- current / VPN public IP;
+- IP verification status.
 
-**Formats:** URI lists · Base64 lists · Clash YAML/JSON · sing-box JSON ·
-single-peer WireGuard configurations.
+Public-IP lookup is informational. Failure of an external IP-check service does **not** tear down an otherwise live VPN tunnel.
 
-TLS, Reality, Vision, WebSocket, gRPC and basic HTTP transports are supported
-where applicable. Unsupported entries are counted and skipped visibly.
-Provider-specific extensions such as XHTTP, external Shadowsocks plugins,
-arbitrary routing rules and insecure TLS are not imported.
+## Subscriptions
 
-SOCKS servers need UDP support for UDP games. IPv6 requires provider support;
-unsupported traffic does not receive a direct fallback route.
+DeckPort supports two subscription sources.
+
+### URL subscriptions
+
+Add an HTTP or HTTPS provider URL directly from the Decky interface.
+
+HTTP subscriptions are supported for providers that do not expose HTTPS, but HTTP is unencrypted in transit. Prefer HTTPS whenever your provider offers it.
+
+URL subscriptions can be:
+
+- refreshed;
+- renamed / edited;
+- deleted;
+- used to select any parsed server.
+
+### Local subscription files
+
+You can also import a subscription without typing a long URL on the Steam Deck keyboard.
+
+Place files in:
+
+```text
+/home/deck/homebrew/settings/decky-vpn/import/
+```
+
+Then open:
+
+**DeckPort VPN → Subs → Local import → Scan import folder**
+
+Supported file extensions:
+
+```text
+.txt
+.conf
+.json
+.yaml
+.yml
+```
+
+A local subscription remembers its source file. **Reload local file** reparses the same file after you replace or edit it.
+
+For safety, DeckPort only reads files inside its dedicated import directory. Arbitrary paths, traversal such as `../`, symlinks, unsupported extensions and oversized files are rejected.
+
+### Supported formats
+
+Protocols:
+
+- VLESS
+- VMess
+- Trojan
+- Shadowsocks
+- SOCKS5
+- WireGuard
+
+Formats:
+
+- plain URI lists;
+- Base64 URI lists;
+- Clash YAML / JSON;
+- sing-box JSON;
+- single-peer WireGuard configuration.
+
+TLS, Reality, Vision, WebSocket, gRPC and common HTTP transports are supported where applicable.
+
+Unsupported or unsafe entries are skipped and reported in the subscription UI.
+
+Provider-specific features such as arbitrary routing rules, local file references, external Shadowsocks plugins and insecure TLS settings are not imported.
+
+## Servers & latency
+
+The **Servers** page provides:
+
+- subscription selection;
+- server search;
+- server selection;
+- **Ping all servers**;
+- sorting by **Default**, **Fastest** or **Name**.
+
+For TCP-based protocols, DeckPort measures TCP connection latency to the actual VPN endpoint rather than ICMP ping. This makes the result more relevant to whether that endpoint is reachable from the Deck.
+
+Example:
+
+```text
+Germany #1
+VLESS • 34 ms
+
+Finland #2
+Trojan • 48 ms
+
+USA #3
+VMess • Timeout
+```
+
+WireGuard endpoints are UDP, so a TCP latency measurement would be misleading. They are shown as having UDP latency unavailable rather than displaying a fake ping result.
+
+Subscription endpoints resolving to private or non-global addresses are not probed. This prevents an untrusted subscription from turning the latency feature into a localhost or LAN scanner.
+
+## Connection verification
+
+DeckPort separates **tunnel health** from **public-IP verification**.
+
+A successful VPN connection requires the sing-box process and DeckPort TUN interface to remain alive.
+
+The UI may additionally report:
+
+- **Public IP changed** — an external IP was obtained and differs from the pre-VPN address;
+- **Public IP did not change** — the tunnel is alive, but the observed public address is unchanged;
+- **IP verification unavailable** — the tunnel is alive, but external public-IP services could not be reached.
+
+External IP verification failure alone does not disconnect a working tunnel.
 
 ## How it works
 
 ```text
-Decky Quick Access Menu
-         │ typed RPC + status events
-         ▼
-Python backend ── private subscription storage
-         │ validated node → generated configuration
-         ▼
-Process guardian ── watches backend lifetime, owns cleanup
-         │
-         ▼
-Bundled sing-box ── TUN interface ── SteamOS traffic
+Steam Deck Quick Access Menu
+            │
+            │ typed RPC + status events
+            ▼
+      Python backend
+       │          │
+       │          ├── subscription storage
+       │          ├── local import directory
+       │          ├── latency probes
+       │          └── public-IP verification
+       │
+       │ validated node
+       ▼
+   config generator
+       │
+       ▼
+   process guardian
+       │
+       ▼
+ bundled sing-box
+       │
+       ▼
+  deckyvpn0 TUN
+       │
+       ▼
+ SteamOS / games / Steam
 ```
 
-The backend checks the system route and internet access before reporting
-`CONNECTED`. DNS uses the VPN. Disconnect stops the core and removes its
-network state; losing the frontend does not disconnect an active tunnel.
+The frontend does not own the VPN process.
 
-## Privacy & recovery
+The backend maintains connection state, and the guardian owns core lifetime and network cleanup. Closing the Quick Access Menu therefore does not disconnect an active tunnel.
 
-- Credentials and subscription URLs stay out of public UI data and diagnostics.
-- Settings are local with restrictive permissions, **not encrypted**.
-- Subscription content is untrusted input; it cannot supply shell commands.
-- HTTPS certificate validation stays enabled. The first VPN endpoint DNS lookup
-  happens before the tunnel is established.
-- **No kill switch in this preview.** A crash restores ordinary networking.
-  Reconnection is manual; do not rely on this version for fail-closed privacy.
+Disconnect stops sing-box and removes DeckPort-owned TUN/routing state.
 
-See [the technical guide](docs/DEVELOPMENT.ru.md) for routing ownership,
-DNS behavior, cleanup details and a Steam Deck acceptance checklist.
+## Privacy & security
 
-## Development
-
-Node.js 22+, pnpm 9+, Python 3.10+.
-
-```bash
-pnpm install --frozen-lockfile
-python scripts/fetch_deps.py
-pnpm typecheck
-pnpm build
-python -m unittest discover -s tests -v
-python scripts/check_core.py
-python scripts/package.py
-```
-
-On Windows, run `python scripts/fetch_deps.py --windows-checker` before core
-validation. Linux integration testing uses an isolated network namespace:
-
-```bash
-sudo unshare --net --mount --mount-proc python3 -u scripts/linux_smoke.py
-```
-
-This tests actual TCP traffic through TUN, Disconnect, core exit, backend-pipe
-loss and guardian recovery. It refuses the host network namespace. GitHub
-Actions builds and tests release artifacts.
-
-## Roadmap
-
-- [x] Subscription → server → system TUN → disconnect
-- [x] Independent backend and crash cleanup
-- [x] Verified release installer and update backups
-- [ ] Steam Deck LCD/OLED hardware acceptance
-- [ ] Favorites, latency tests and sorting
-- [ ] Auto-connect, retry/backoff and sleep/resume recovery
-- [ ] Kill switch and split tunneling after base networking is stable
-
-## Credits & license
-
-Built on the official [Decky plugin template](https://github.com/SteamDeckHomebrew/decky-plugin-template)
-and [sing-box](https://github.com/SagerNet/sing-box).
-Independent project; not affiliated with Valve, Steam Deck Homebrew or SagerNet.
-
-Plugin code: [GPL-3.0-or-later](LICENSE). Dependency notices and source
-distribution details: [THIRD_PARTY.md](THIRD_PARTY.md).
+- Subscription credentials and URLs are excluded from public frontend subscription objects.
+- Diagnostics intentionally omit provider URLs, hosts, credentials and raw sing-box output.
+- Settings stay local and use restrictive filesystem permissions.
+- Stored settings are **not encrypted at rest**.
+- Subscription content is treated as untrusted input.
+- Subscription data cannot provide shell commands.
+- HTTPS certificate validation remains enabled.
+- Local imports are restricted to DeckPort's dedicated import directory.
+- Latency probes reject private and non-global destinations.
+- There is currently **no kill switch**.
+- If
