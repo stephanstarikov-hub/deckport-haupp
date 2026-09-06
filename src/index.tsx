@@ -407,25 +407,50 @@ function Content() {
 
         <Focusable
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 8,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 6,
+            marginTop: 10,
+            padding: "0 2px",
           }}
         >
-          <DialogButton onClick={() => setPage("vpn")}>
-            {page === "vpn" ? " " : ""}
-            VPN
-          </DialogButton>
+          {[
+            ["vpn", "VPN"],
+            ["servers", "Servers"],
+            ["subscriptions", "Subs"],
+          ].map(([key, label]) => {
+            const active = page === key;
 
-          <DialogButton onClick={() => setPage("servers")}>
-            {page === "servers" ? " " : ""}
-            Servers
-          </DialogButton>
-
-          <DialogButton onClick={() => setPage("subscriptions")}>
-            {page === "subscriptions" ? " " : ""}
-            Subs
-          </DialogButton>
+            return (
+              <div
+                key={key}
+                onClick={() =>
+                  setPage(
+                    key as "vpn" | "servers" | "subscriptions"
+                  )
+                }
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  textAlign: "center",
+                  padding: "8px 4px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: active ? 700 : 500,
+                  opacity: active ? 1 : 0.6,
+                  background: active
+                    ? "rgba(255,255,255,0.10)"
+                    : "transparent",
+                  borderBottom: active
+                    ? "2px solid rgba(255,255,255,0.85)"
+                    : "2px solid transparent",
+                }}
+              >
+                {label}
+              </div>
+            );
+          })}
         </Focusable>
       </PanelSection>
 

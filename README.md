@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/banner.svg" alt="DeckPort VPN — Your connection. Your Deck." width="100%" />
+  <img src="docs/assets/banner.svg" alt="DeckPort VPN  Your connection. Your Deck." width="100%" />
 </p>
 
 <p align="center">
@@ -15,12 +15,12 @@
 </p>
 
 <p align="center">
-  <a href="#install">Install</a> ·
-  <a href="#subscriptions">Subscriptions</a> ·
-  <a href="#servers--latency">Servers</a> ·
-  <a href="#how-it-works">How it works</a> ·
-  <a href="#development">Development</a> ·
-  <a href="docs/DEVELOPMENT.ru.md">Документация на русском</a>
+  <a href="#install">Install</a> 
+  <a href="#subscriptions">Subscriptions</a> 
+  <a href="#servers--latency">Servers</a> 
+  <a href="#how-it-works">How it works</a> 
+  <a href="#development">Development</a> 
+  <a href="docs/DEVELOPMENT.ru.md">???????????? ?? ???????</a>
 </p>
 
 ---
@@ -96,7 +96,7 @@ Saved DeckPort settings and installer backups are intentionally left untouched.
 
 ## First connection
 
-1. Open **Decky → DeckPort VPN**.
+1. Open **Decky  DeckPort VPN**.
 2. Open **Subs**.
 3. Add a provider URL or import a local subscription file.
 4. Open **Servers**.
@@ -130,7 +130,7 @@ HTTP subscriptions are supported for providers that do not expose HTTPS, but HTT
 URL subscriptions can be:
 
 - refreshed;
-- renamed / edited;
+- edited;
 - deleted;
 - used to select any parsed server.
 
@@ -146,7 +146,7 @@ Place files in:
 
 Then open:
 
-**DeckPort VPN → Subs → Local import → Scan import folder**
+**DeckPort VPN  Subs  Local import  Scan import folder**
 
 Supported file extensions:
 
@@ -197,24 +197,11 @@ The **Servers** page provides:
 - **Ping all servers**;
 - sorting by **Default**, **Fastest** or **Name**.
 
-For TCP-based protocols, DeckPort measures TCP connection latency to the actual VPN endpoint rather than ICMP ping. This makes the result more relevant to whether that endpoint is reachable from the Deck.
+For TCP-based protocols, DeckPort measures TCP connection latency to the actual VPN endpoint rather than ICMP ping.
 
-Example:
+WireGuard endpoints are UDP, so TCP latency is not reported for them.
 
-```text
-Germany #1
-VLESS • 34 ms
-
-Finland #2
-Trojan • 48 ms
-
-USA #3
-VMess • Timeout
-```
-
-WireGuard endpoints are UDP, so a TCP latency measurement would be misleading. They are shown as having UDP latency unavailable rather than displaying a fake ping result.
-
-Subscription endpoints resolving to private or non-global addresses are not probed. This prevents an untrusted subscription from turning the latency feature into a localhost or LAN scanner.
+Subscription endpoints resolving to private or non-global addresses are not probed.
 
 ## Connection verification
 
@@ -224,9 +211,9 @@ A successful VPN connection requires the sing-box process and DeckPort TUN inter
 
 The UI may additionally report:
 
-- **Public IP changed** — an external IP was obtained and differs from the pre-VPN address;
-- **Public IP did not change** — the tunnel is alive, but the observed public address is unchanged;
-- **IP verification unavailable** — the tunnel is alive, but external public-IP services could not be reached.
+- **Public IP changed**
+- **Public IP did not change**
+- **IP verification unavailable**
 
 External IP verification failure alone does not disconnect a working tunnel.
 
@@ -234,30 +221,30 @@ External IP verification failure alone does not disconnect a working tunnel.
 
 ```text
 Steam Deck Quick Access Menu
-            │
-            │ typed RPC + status events
-            ▼
+            
+             typed RPC + status events
+            
       Python backend
-       │          │
-       │          ├── subscription storage
-       │          ├── local import directory
-       │          ├── latency probes
-       │          └── public-IP verification
-       │
-       │ validated node
-       ▼
+                 
+                  subscription storage
+                  local import directory
+                  latency probes
+                  public-IP verification
+       
+        validated node
+       
    config generator
-       │
-       ▼
+       
+       
    process guardian
-       │
-       ▼
+       
+       
  bundled sing-box
-       │
-       ▼
+       
+       
   deckyvpn0 TUN
-       │
-       ▼
+       
+       
  SteamOS / games / Steam
 ```
 
@@ -279,9 +266,7 @@ Disconnect stops sing-box and removes DeckPort-owned TUN/routing state.
 - Local imports are restricted to DeckPort's dedicated import directory.
 - Latency probes reject private and non-global destinations.
 - There is currently **no kill switch**.
-- If the VPN core stops unexpectedly, DeckPort attempts to restore ordinary networking rather than intentionally leaving the Deck offline.
-
-Do not rely on the current preview as a fail-closed anonymity or censorship-resistance solution.
+- If the VPN core stops unexpectedly, DeckPort attempts to restore ordinary networking.
 
 ## Development
 
@@ -290,8 +275,6 @@ Requirements:
 - Node.js 22+
 - pnpm 9
 - Python 3.10+
-
-Install and test:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -303,40 +286,32 @@ python scripts/check_core.py
 python scripts/package.py
 ```
 
-The Python suite currently covers subscription parsing, installer behavior, backend lifecycle, RPC safety and local-file subscription import.
-
-Linux integration testing runs inside an isolated network namespace:
+Linux integration testing:
 
 ```bash
 sudo unshare --net --mount --mount-proc python3 -u scripts/linux_smoke.py
 ```
 
-The smoke test exercises real TCP traffic through the generated TUN, normal Disconnect and multiple process-cleanup scenarios.
-
-It deliberately refuses to run in the host network namespace.
-
-On Windows, use:
+On Windows:
 
 ```powershell
 python scripts/fetch_deps.py --windows-checker
 ```
 
-before core validation where required.
-
 ### pnpm note
 
-The GitHub Actions workflows already specify pnpm 9.
+GitHub Actions already specifies pnpm 9.
 
-Do not commit an automatically generated `packageManager` field to `package.json` while the workflow also supplies its own pnpm version, otherwise `pnpm/action-setup` will reject the duplicate version configuration.
+Do not commit an automatically generated `packageManager` field to `package.json` while the workflow also supplies its own pnpm version.
 
 ## Project status
 
 Completed:
 
-- [x] Subscription → server → system-wide TUN
+- [x] Subscription  server  system-wide TUN
 - [x] Gaming Mode connect / disconnect
-- [x] URL subscriptions over HTTPS
-- [x] URL subscriptions over HTTP
+- [x] HTTPS subscriptions
+- [x] HTTP subscriptions
 - [x] Local subscription file import
 - [x] Safe local import directory
 - [x] Subscription refresh / reload
@@ -353,7 +328,7 @@ Completed:
 Possible future work:
 
 - [ ] Favorites
-- [ ] Per-server automatic background latency refresh
+- [ ] Automatic background latency refresh
 - [ ] Auto-connect
 - [ ] Retry / backoff
 - [ ] Better sleep / resume handling
@@ -367,10 +342,6 @@ Built using the official Decky plugin ecosystem and powered by sing-box.
 
 Independent project; not affiliated with Valve, Steam, Steam Deck Homebrew or SagerNet.
 
-Plugin code:
+Plugin code: [GPL-3.0-or-later](LICENSE)
 
-[GPL-3.0-or-later](LICENSE)
-
-Third-party dependency notices and corresponding-source information:
-
-[THIRD_PARTY.md](THIRD_PARTY.md)
+Third-party dependency notices and corresponding-source information: [THIRD_PARTY.md](THIRD_PARTY.md)
