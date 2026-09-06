@@ -234,7 +234,7 @@ class Service:
 
     def diagnostic(self):
         # Deliberately omit server/provider labels, host, URL, keys and raw core output.
-        return json.dumps({"plugin": "0.1.0", "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
+        return json.dumps({"plugin": "0.1.1", "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
 
     def get_logs(self):
         return (self.logs / "plugin.log").read_text(encoding="utf-8")[-12000:]

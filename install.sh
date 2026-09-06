@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 repo='stephanstarikov-hub/deckport-vpn'
-version='0.1.0'
+version='0.1.1'
 while (($#)); do
   case "$1" in
     --repo) [[ $# -ge 2 ]] || { printf '%s\n' 'Missing --repo value' >&2; exit 1; }; repo="$2"; shift 2 ;;
