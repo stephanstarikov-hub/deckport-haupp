@@ -1,4 +1,5 @@
-﻿mod ipc;
+mod ipc;
+mod setup;
 
 use eframe::egui;
 use serde_json::{json, Value};
@@ -14,6 +15,7 @@ struct DeckPortApp {
     search: String,
     error: String,
     last_refresh: Instant,
+    setup: Option<setup::SetupState>,
 }
 
 impl DeckPortApp {
@@ -26,10 +28,24 @@ impl DeckPortApp {
             search: String::new(),
             error: String::new(),
             last_refresh: Instant::now() - Duration::from_secs(10),
+            setup: None,
         };
 
         app.refresh();
         app
+    }
+
+    fn new_setup() -> Self {
+        Self {
+            status: json!({}),
+            subscriptions: Vec::new(),
+            servers: Vec::new(),
+            selected_subscription: None,
+            search: String::new(),
+            error: String::new(),
+            last_refresh: Instant::now(),
+            setup: Some(setup::SetupState::new()),
+        }
     }
 
     fn refresh(&mut self) {
@@ -137,6 +153,11 @@ impl eframe::App for DeckPortApp {
         ui: &mut egui::Ui,
         _frame: &mut eframe::Frame,
     ) {
+        if let Some(setup) = self.setup.as_mut() {
+            setup.ui(ui);
+            return;
+        }
+
         if self.last_refresh.elapsed() >= Duration::from_secs(2) {
             self.refresh();
         }
@@ -307,7 +328,53 @@ impl eframe::App for DeckPortApp {
     }
 }
 
+fn run_cli_action(argument: &str) -> Result<bool, String> {
+    match argument {
+        "--connect" => {
+            let status = ipc::call("status", vec![])?;
+
+            let selected = status
+                .get("selected")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    "No VPN server is selected".to_string()
+                })?
+                .to_owned();
+
+            ipc::call(
+                "connect",
+                vec![json!(selected)],
+            )?;
+
+            Ok(true)
+        }
+
+        "--disconnect" => {
+            ipc::call("disconnect", vec![])?;
+            Ok(true)
+        }
+
+        _ => Ok(false),
+    }
+}
 fn main() -> eframe::Result {
+    let mut setup_mode = false;
+
+    if let Some(argument) = std::env::args().nth(1) {
+        if argument == "--setup" {
+            setup_mode = true;
+        } else {
+            match run_cli_action(&argument) {
+                Ok(true) => return Ok(()),
+                Ok(false) => {}
+                Err(message) => {
+                    eprintln!("DeckPort VPN: {message}");
+                    return Ok(());
+                }
+            }
+        }
+    }
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([960.0, 680.0])
@@ -318,8 +385,14 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "DeckPort VPN",
         options,
-        Box::new(|_| {
-            Ok(Box::new(DeckPortApp::new()))
+        Box::new(move |_| {
+            let app = if setup_mode {
+                DeckPortApp::new_setup()
+            } else {
+                DeckPortApp::new()
+            };
+
+            Ok(Box::new(app))
         }),
     )
 }
