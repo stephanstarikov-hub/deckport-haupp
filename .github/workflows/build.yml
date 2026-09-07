@@ -24,8 +24,9 @@ jobs:
 
       - name: Build native Desktop client
         run: |
-          cargo build --manifest-path desktop-native/Cargo.toml --release
+          cargo build --manifest-path desktop-native/Cargo.toml --release --locked
           cp desktop-native/target/release/deckport-vpn-desktop desktop/deckport
+          python scripts/rust_licenses.py
       - run: pnpm install --frozen-lockfile
       - run: python scripts/fetch_deps.py
       - run: pnpm typecheck && pnpm build

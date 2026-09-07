@@ -118,13 +118,13 @@ DeckPort VPN 0.2.x использует постоянный системный 
 - интернет во время установки
 - поддерживаемая VPN-подписка
 
-### Установка 0.2.1
+### Установка 0.2.3
 
 Откройте Konsole в Desktop Mode:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.2/install.sh -o /tmp/deckport-install.sh
-bash /tmp/deckport-install.sh --version 0.2.2
+curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.3/install.sh -o /tmp/deckport-install.sh
+bash /tmp/deckport-install.sh --version 0.2.3
 ```
 
 Установщик:

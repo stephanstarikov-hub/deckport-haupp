@@ -250,6 +250,7 @@ def main():
         "py_modules/yaml/__init__.py",
         "LICENSE",
         "licenses/sing-box-LICENSE",
+        "licenses/rust-third-party.txt",
         "daemon-entry.py",
         "desktop/deckport",
         "desktop/setup.py",
