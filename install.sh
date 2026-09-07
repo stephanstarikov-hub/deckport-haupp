@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 repo='stephanstarikov-hub/deckport-haupp'
-version='0.2.4'
+version='0.2.10'
 
 while (($#)); do
   case "$1" in
@@ -26,7 +26,7 @@ while (($#)); do
     --help|-h)
       printf '%s\n' \
         'DeckPort VPN installer' \
-        'Usage: bash install.sh [--repo OWNER/REPO] [--version 0.2.4]'
+        'Usage: bash install.sh [--repo OWNER/REPO] [--version 0.2.10]'
       exit 0
       ;;
     *)
@@ -208,3 +208,9 @@ pkexec \
   --payload "$work/payload.zip" \
   --sha256 "$digest" \
   --decky
+printf '%s\n' 'Refreshing Desktop application menu'
+if command -v kbuildsycoca6 >/dev/null 2>&1; then
+  kbuildsycoca6 --noincremental >/dev/null 2>&1 || true
+elif command -v kbuildsycoca5 >/dev/null 2>&1; then
+  kbuildsycoca5 --noincremental >/dev/null 2>&1 || true
+fi

@@ -1,6 +1,6 @@
-﻿[package]
+[package]
 name = "deckport-vpn-desktop"
-version = "0.2.4"
+version = "0.2.10"
 edition = "2024"
 license = "GPL-3.0-or-later"
 

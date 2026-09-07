@@ -18,6 +18,7 @@ from .storage import Store, private_dir, atomic_json
 from .subscription.fetch import download, validate_url
 from .subscription.model import public_node
 from .subscription.parser import parse
+from .subscription.source import remote_subscription_url
 from .safe_fs import read_regular
 from .version import VERSION, PROTOCOL_VERSION
 
@@ -87,6 +88,7 @@ class Service:
             "skipped": s["skipped"],
             "source_type": s.get("source_type", "url"),
             "source_label": s.get("source") if s.get("source_type") == "file" else "URL",
+            "status": s.get("status", "active" if s.get("nodes") else "inactive"),
         } for s in self.store.data["subscriptions"]]
 
     @staticmethod
@@ -160,14 +162,29 @@ class Service:
             raise VPNError("Subscription file could not be read safely") from None
 
     async def import_content(self, content, name):
+        if not isinstance(content, str):
+            raise VPNError("Subscription content must be text")
+
         if len(content.encode("utf-8")) > 4 * 1024 * 1024:
             raise VPNError("Subscription file is too large")
+
+        remote = remote_subscription_url(content)
+
+        if remote is not None:
+            if name is None or not str(name).strip():
+                from urllib.parse import urlsplit
+                name = urlsplit(remote).hostname or "Subscription"
+
+            return await self.add_or_update(remote, name)
+
         filename = uuid.uuid4().hex + ".txt"
         target = self.import_dir / filename
-        # Unique daemon-owned path. No client-provided filesystem path is used.
+
         with target.open("x", encoding="utf-8") as stream:
             stream.write(content)
+
         target.chmod(0o600)
+
         try:
             return await self.import_subscription(filename, name)
         except BaseException:
@@ -204,22 +221,17 @@ class Service:
 
             candidate = raw.strip()
             metadata = {}
+            remote = remote_subscription_url(candidate)
 
-            # A local import file may contain either the subscription itself
-            # or a single HTTP/HTTPS subscription URL.
-            if (
-                candidate.startswith(("http://", "https://"))
-                and "\n" not in candidate
-                and "\r" not in candidate
-            ):
-                validate_url(candidate)
-
+            if remote is not None:
                 if self.download_lock.locked():
-                    raise VPNError("A subscription download is already running")
+                    raise VPNError(
+                        "A subscription download is already running"
+                    )
 
                 async with self.download_lock:
                     raw, metadata = await asyncio.wait_for(
-                        asyncio.to_thread(download, candidate),
+                        asyncio.to_thread(download, remote),
                         30,
                     )
 
@@ -247,20 +259,29 @@ class Service:
             if old:
                 self.store.data["subscriptions"].remove(old)
 
+            if remote is not None:
+                source_type = "url"
+                source = remote
+            else:
+                source_type = "file"
+                source = filename
+
             record = {
                 "id": identifier,
                 "name": name.strip(),
-                "source_type": "file",
-                "source": filename,
+                "source_type": source_type,
+                "source": source,
+                **({"url": remote} if remote is not None else {}),
                 "nodes": nodes,
                 "skipped": skipped,
                 "metadata": metadata,
                 "updated": int(time.time()),
+                "status": "active" if nodes else "inactive",
             }
 
             self.store.data["subscriptions"].append(record)
 
-            if self.store.data["selected"] is None:
+            if nodes and self.store.data["selected"] is None:
                 self.store.data["selected"] = nodes[0]["id"]
             elif (
                 old
@@ -273,7 +294,7 @@ class Service:
                     for n in nodes
                 )
             ):
-                self.store.data["selected"] = nodes[0]["id"]
+                self.store.data["selected"] = nodes[0]["id"] if nodes else None
 
             self.store.save()
             self.state["selected"] = self.store.data["selected"]
@@ -457,12 +478,13 @@ class Service:
                 "skipped": skipped,
                 "metadata": metadata,
                 "updated": int(time.time()),
+                "status": "active" if nodes else "inactive",
             }
             self.store.data["subscriptions"].append(record)
-            if self.store.data["selected"] is None:
+            if nodes and self.store.data["selected"] is None:
                 self.store.data["selected"] = nodes[0]["id"]
             elif old and any(n["id"] == self.store.data["selected"] for n in old["nodes"]) and not any(n["id"] == self.store.data["selected"] for n in nodes):
-                self.store.data["selected"] = nodes[0]["id"]
+                self.store.data["selected"] = nodes[0]["id"] if nodes else None
             self.store.save()
             self.state["selected"] = self.store.data["selected"]
         return {"id": identifier, "count": len(nodes), "skipped": skipped}
