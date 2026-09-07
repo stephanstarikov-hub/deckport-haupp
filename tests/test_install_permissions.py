@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -47,7 +47,7 @@ class InstallerPermissions(unittest.TestCase):
             "main.py": b"pass\n",
             "plugin.json": b"{}",
             "dist/index.js": b"// test\n",
-            "desktop/deckport": b"#!/usr/bin/env python3\n",
+            "desktop/deckport": b"\x7fELFdesktop-test",
             "assets/deckport-vpn.svg": b"<svg/>",
             "installer/entry.py": b"pass\n",
             "py_modules/yaml/__init__.py": b"",
