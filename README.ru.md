@@ -36,7 +36,7 @@ DeckPort VPN — VPN-клиент с открытым исходным кодо�
 
 Репозиторий проекта: **deckport-haupp**
 
-> DeckPort VPN 0.2.4 — первый стабильный Desktop-релиз. Автоматические Linux-тесты
+> DeckPort VPN 0.2.10 — первый стабильный Desktop-релиз. Автоматические Linux-тесты
 > не заменяют отдельный acceptance checklist для Steam Deck LCD и OLED.
 
 ## Возможности
@@ -120,13 +120,13 @@ DeckPort VPN 0.2.x использует постоянный системный 
 - интернет во время установки
 - поддерживаемая VPN-подписка
 
-### Установка 0.2.4
+### Установка 0.2.10
 
 Откройте Konsole в Desktop Mode:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.4/install.sh -o /tmp/deckport-install.sh
-bash /tmp/deckport-install.sh --version 0.2.4
+curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.10/install.sh -o /tmp/deckport-install.sh
+bash /tmp/deckport-install.sh --version 0.2.10
 ```
 
 Установщик:
