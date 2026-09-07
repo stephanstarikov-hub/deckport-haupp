@@ -44,4 +44,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" release/* --verify-tag --prerelease --title "DeckPort VPN $RELEASE_TAG РІР‚вЂќ preview" --notes-file .github/RELEASE_NOTES.md
+        run: gh release create "$RELEASE_TAG" release/* --verify-tag --prerelease --title "DeckPort VPN $RELEASE_TAG - preview" --notes-file .github/RELEASE_NOTES.md
