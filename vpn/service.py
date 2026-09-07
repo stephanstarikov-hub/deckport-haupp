@@ -4,6 +4,8 @@ import json
 import logging
 import ipaddress
 import socket
+import os
+import hashlib
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 import time
@@ -16,6 +18,8 @@ from .storage import Store, private_dir, atomic_json
 from .subscription.fetch import download, validate_url
 from .subscription.model import public_node
 from .subscription.parser import parse
+from .safe_fs import read_regular
+from .version import VERSION, PROTOCOL_VERSION
 
 
 class Service:
@@ -33,6 +37,12 @@ class Service:
         self.task = None
         self.monitor = None
         self.closing = False
+        self.maintenance = False
+        self.legacy_import_dir = None
+        self.retry_at = 0
+        self.retry_delay = 2
+        self.network_signature = None
+        self.last_tick = self.boottime()
         self.logger = logging.getLogger("decky-vpn-safe")
         self.logger.setLevel(logging.INFO)
         self.logger.propagate = False
@@ -46,6 +56,8 @@ class Service:
         except VPNError as e:
             await self.set_state("ERROR", error=str(e))
         self.monitor = asyncio.create_task(self.watch())
+        if self.store.data["desired_connection"] and self.store.data["selected"]:
+            await self.set_state("RECONNECTING", error=None)
 
     async def set_state(self, state, **kwargs):
         self.state.update(state=state, **kwargs)
@@ -58,7 +70,7 @@ class Service:
 
     def status(self):
         result = copy.deepcopy(self.state)
-        result.update(selected_server=None, selected_subscription=None)
+        result.update(selected_server=None, selected_subscription=None, version=VERSION, maintenance=self.maintenance)
         for subscription in self.store.data["subscriptions"]:
             for n in subscription["nodes"]:
                 if n["id"] == self.state["selected"]:
@@ -99,12 +111,19 @@ class Service:
     def import_files(self):
         files = []
 
-        for path in self.import_dir.iterdir():
+        paths = list(self.import_dir.iterdir())
+        if self.legacy_import_dir and self.legacy_import_dir.is_dir() and not self.legacy_import_dir.is_symlink():
+            paths += list(self.legacy_import_dir.iterdir())[:100]
+        seen = set()
+        for path in paths:
             try:
                 if path.is_symlink() or not path.is_file():
                     continue
 
                 self.validate_import_filename(path.name)
+                if path.name in seen:
+                    continue
+                seen.add(path.name)
 
                 stat = path.stat()
                 if stat.st_size > 8 * 1024 * 1024:
@@ -124,6 +143,8 @@ class Service:
     def read_import_file(self, filename):
         filename = self.validate_import_filename(filename)
         path = self.import_dir / filename
+        if not path.exists() and self.legacy_import_dir:
+            path = self.legacy_import_dir / filename
 
         if not path.exists() or path.is_symlink() or not path.is_file():
             raise VPNError("Import file not found")
@@ -132,9 +153,26 @@ class Service:
             raise VPNError("Subscription file is too large")
 
         try:
-            return path.read_text(encoding="utf-8-sig")
+            return read_regular(path, 4 * 1024 * 1024).decode("utf-8-sig")
         except UnicodeDecodeError:
             raise VPNError("Subscription file must be UTF-8 text") from None
+        except (OSError, ValueError):
+            raise VPNError("Subscription file could not be read safely") from None
+
+    async def import_content(self, content, name):
+        if len(content.encode("utf-8")) > 4 * 1024 * 1024:
+            raise VPNError("Subscription file is too large")
+        filename = uuid.uuid4().hex + ".txt"
+        target = self.import_dir / filename
+        # Unique daemon-owned path. No client-provided filesystem path is used.
+        with target.open("x", encoding="utf-8") as stream:
+            stream.write(content)
+        target.chmod(0o600)
+        try:
+            return await self.import_subscription(filename, name)
+        except BaseException:
+            target.unlink(missing_ok=True)
+            raise
 
     async def import_subscription(self, filename, name=None, identifier=None):
         filename = self.validate_import_filename(filename)
@@ -267,7 +305,38 @@ class Service:
         raise VPNError("Server not found; refresh the server list")
 
     def servers(self, subscription_id):
-        return [public_node(n) for n in self.find_subscription(subscription_id)["nodes"]]
+        return [dict(public_node(n), favorite=n["id"] in self.store.data["favorites"]) for n in self.find_subscription(subscription_id)["nodes"]]
+
+    async def favorite(self, identifier, enabled):
+        self.find_node(identifier)
+        favorites = set(self.store.data["favorites"])
+        if enabled:
+            favorites.add(identifier)
+        else:
+            favorites.discard(identifier)
+        self.store.data["favorites"] = sorted(favorites)
+        self.store.save()
+        return enabled
+
+    def preferences(self):
+        return copy.deepcopy(self.store.data["preferences"])
+
+    async def set_preferences(self, values):
+        if set(values) - {"channel", "autostart"} or ("channel" in values and values["channel"] not in ("stable", "preview")) or ("autostart" in values and type(values["autostart"]) is not bool):
+            raise VPNError("Invalid preferences")
+        self.store.data["preferences"].update(values)
+        self.store.save()
+        return self.preferences()
+
+    def prepare_update(self):
+        if self.state["state"] in ("CONNECTING", "RECONNECTING", "DISCONNECTING") or (self.task and not self.task.done()) or self.download_lock.locked() or self.lock.locked():
+            raise VPNError("Wait for the active VPN operation to finish")
+        self.maintenance = True
+        return True
+
+    def resume_operations(self):
+        self.maintenance = False
+        return True
 
     async def ping_servers(self, subscription_id):
         subscription = self.find_subscription(subscription_id)
@@ -442,10 +511,12 @@ class Service:
 
     async def connect(self, identifier):
         async with self.lock:
-            if self.closing or self.core.alive or (self.task and not self.task.done()) or self.state["state"] == "DISCONNECTING":
+            if self.closing or self.maintenance or self.core.alive or (self.task and not self.task.done()) or self.state["state"] == "DISCONNECTING":
                 raise VPNError("A VPN operation is already running")
             n = copy.deepcopy(self.find_node(identifier))
             await self.select(identifier)
+            self.store.data["desired_connection"] = True
+            self.store.save()
             await self.set_state("CONNECTING", server=public_node(n), error=None, public_ip=None, verification=None, since=None)
             self.task = asyncio.create_task(self.run_connection(n))
         return self.status()
@@ -497,6 +568,7 @@ class Service:
                 since=int(time.time()),
                 error=None,
             )
+            self.retry_delay = 2
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -506,9 +578,14 @@ class Service:
             except VPNError:
                 error = "VPN cleanup failed; retry Disconnect"
             await self.set_state("ERROR", error=error, public_ip=None)
+            self.retry_at = self.boottime() + self.retry_delay
+            self.retry_delay = min(self.retry_delay * 2, 60)
 
-    async def disconnect(self):
+    async def disconnect(self, preserve_intent=False):
         async with self.lock:
+            if not preserve_intent:
+                self.store.data["desired_connection"] = False
+                self.store.save()
             await self.set_state("DISCONNECTING", error=None)
             if self.task and not self.task.done():
                 self.task.cancel()
@@ -521,20 +598,53 @@ class Service:
             await self.set_state("DISCONNECTED", server=None, error=None, public_ip=None, verification=None, since=None)
             return self.status()
 
+    @staticmethod
+    def boottime():
+        return time.clock_gettime(time.CLOCK_BOOTTIME) if hasattr(time, "CLOCK_BOOTTIME") else time.monotonic()
+
+    async def network_fingerprint(self):
+        if os.name != "posix":
+            return None
+        try:
+            process = await asyncio.create_subprocess_exec("ip", "-j", "route", "show", "table", "main", "default", stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+            try:
+                data, _ = await asyncio.wait_for(process.communicate(), 3)
+            except BaseException:
+                process.kill()
+                await process.wait()
+                raise
+            routes = json.loads(data)
+            return hashlib.sha256(json.dumps(routes, sort_keys=True).encode()).hexdigest()
+        except Exception:
+            return None
+
+    async def watch_tick(self, fingerprint, now):
+        resumed = now - self.last_tick > 15
+        changed = self.network_signature is not None and fingerprint is not None and fingerprint != self.network_signature
+        self.last_tick, self.network_signature = now, fingerprint
+        if self.maintenance or self.closing or not self.store.data["desired_connection"]:
+            return
+        if self.task and not self.task.done():
+            return
+        if self.state["state"] == "CONNECTED" and (not self.core.alive or changed or resumed or not await self.core.route_verified()):
+            await self.disconnect(preserve_intent=True)
+            if self.state["state"] == "ERROR":
+                return
+            await self.set_state("RECONNECTING", error=None)
+        if self.state["state"] in ("RECONNECTING", "ERROR", "DISCONNECTED") and now >= self.retry_at:
+            try:
+                await self.connect(self.store.data["selected"])
+            except VPNError:
+                self.retry_at = now + 10
+
     async def watch(self):
         try:
             while True:
                 await asyncio.sleep(2)
-                if self.state["state"] == "CONNECTED" and not self.core.alive:
-                    async with self.lock:
-                        if self.state["state"] != "CONNECTED":
-                            continue
-                        try:
-                            await self.core.stop()
-                            message = "VPN core stopped unexpectedly; reconnect to continue"
-                        except VPNError:
-                            message = "VPN cleanup failed; retry Disconnect"
-                        await self.set_state("ERROR", error=message, public_ip=None)
+                try:
+                    await self.watch_tick(await self.network_fingerprint(), self.boottime())
+                except Exception:
+                    self.logger.info("Network recovery will retry")
         except asyncio.CancelledError:
             return
 
@@ -569,16 +679,16 @@ class Service:
 
     def diagnostic(self):
         # Deliberately omit server/provider labels, host, URL, keys and raw core output.
-        return json.dumps({"plugin": "0.1.4", "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
+        return json.dumps({"plugin": VERSION, "daemon": VERSION, "protocol": PROTOCOL_VERSION, "core": CORE_VERSION, "state": self.state["state"], "core_alive": self.core.alive, "cleanup_pending": (self.runtime / "network-owned.json").exists(), "subscription_count": len(self.store.data["subscriptions"]), "platform": "SteamOS/Linux required"}, indent=2)
 
     def get_logs(self):
         return (self.logs / "plugin.log").read_text(encoding="utf-8")[-12000:]
 
-    async def close(self):
+    async def close(self, preserve_intent=False):
         self.closing = True
         if self.monitor:
             self.monitor.cancel()
             await asyncio.gather(self.monitor, return_exceptions=True)
-        await self.disconnect()
+        await self.disconnect(preserve_intent=preserve_intent)
         self.log_handler.close()
         self.logger.removeHandler(self.log_handler)

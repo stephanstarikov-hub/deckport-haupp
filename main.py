@@ -8,38 +8,22 @@ import decky
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "py_modules"))
 sys.path.insert(0, str(ROOT))
-from vpn.service import Service
+from vpn.ipc import Client
 from vpn.errors import VPNError
 
 
 class Plugin:
     async def _main(self):
-        os.umask(0o077)
-        self.ready = asyncio.Event()
-        self.service = None
-        try:
-            self.service = Service(ROOT, Path(decky.DECKY_PLUGIN_SETTINGS_DIR), Path(decky.DECKY_PLUGIN_RUNTIME_DIR), Path(decky.DECKY_PLUGIN_LOG_DIR), decky.emit)
-            await self.service.initialize()
-        except Exception:
-            decky.logger.error("Decky VPN initialization failed; check storage permissions")
-        finally:
-            self.ready.set()
+        self.client = Client()
 
     async def _rpc(self, method, *args):
         try:
-            if not hasattr(self, "ready"):
-                raise VPNError("VPN backend is starting; try again")
-            await asyncio.wait_for(self.ready.wait(), 30)
-            if self.service is None:
-                raise VPNError("VPN backend could not initialize its private storage")
-            result = getattr(self.service, method)(*args)
-            if asyncio.iscoroutine(result):
-                result = await result
-            return {"ok": True, "data": result}
-        except VPNError as e:
-            return {"ok": False, "error": str(e)}
+            if not hasattr(self, "client"):
+                self.client = Client()
+            return {"ok": True, "data": await self.client.call(method, *args)}
+        except VPNError as error:
+            return {"ok": False, "error": str(error)}
         except Exception:
-            # Never return repr(exception): urllib/core errors may contain secrets.
             return {"ok": False, "error": "Operation failed; view safe diagnostic information"}
 
     async def get_status(self):
@@ -90,10 +74,13 @@ class Plugin:
     async def get_diagnostic_info(self):
         return await self._rpc("diagnostic")
 
+    async def set_favorite(self, server_id, enabled):
+        return await self._rpc("favorite", server_id, enabled)
+
     async def _unload(self):
-        if getattr(self, "service", None):
-            await self.service.close()
+        # A client going away must never disconnect the system VPN.
+        pass
 
     async def _uninstall(self):
-        if getattr(self, "service", None):
-            await self.service.disconnect()
+        # Removing the Decky client also leaves the Desktop-owned service alone.
+        pass

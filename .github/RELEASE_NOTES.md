@@ -1,12 +1,20 @@
-DeckPort VPN puts subscription-based VPN controls inside the Steam Deck Quick Access Menu.
+# DeckPort VPN 0.2.4
 
-This preview includes subscription import, server selection, Connect/Disconnect,
-system TUN routing, DNS through VPN, and a bundled sing-box 1.14.0 core.
+DeckPort VPN 0.2.4 is the first stable release of the native Desktop Mode client.
 
-Install using `install.sh` or the attached plugin ZIP.
-The shell installer verifies SHA-256 and preserves a backup when updating.
-Attach the source ZIP alongside the binary ZIP when redistributing.
+Highlights:
 
-Validation: Python tests, TypeScript build, seven core configurations and actual
-TUN traffic/cleanup in an isolated Linux namespace. Steam Deck LCD/OLED hardware
-acceptance is pending. No kill switch or automatic reconnect in this preview.
+- four focused Desktop screens: VPN, Servers, Subscriptions and Settings;
+- subscriptions are shared immediately between Decky and Desktop through `deckportd`;
+- add, refresh, edit, delete, local-file import and pasted-text import in Desktop Mode;
+- Ping All, latency display and sorting by latency or name;
+- shared favorite servers, with a favorites-only filter;
+- all network and IPC operations run outside the GUI thread;
+- update channel, KDE autostart, safe diagnostics and Setup access;
+- persistent root daemon and Unix socket IPC continue across Gaming/Desktop switches;
+- bundled and checksum-pinned sing-box 1.14.0 core.
+
+Release validation covers Python tests, TypeScript type checking, Decky frontend
+build, locked Rust build and clippy, payload verification, installer rollback and
+isolated Linux TUN traffic. Steam Deck LCD/OLED hardware acceptance remains a
+separate manual check and is not claimed by CI.

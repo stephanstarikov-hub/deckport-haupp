@@ -8,6 +8,8 @@ Decky VPN plugin source: GPL-3.0-or-later. See LICENSE.
 - @decky/api 1.1.3 and @decky/ui 4.12.0, LGPL-2.1. Notices copied into releases.
 - react-icons, MIT (individual icon sets retain their own licenses); tslib, 0BSD. Notices included in releases.
 
+- Native Desktop client uses Rust with eframe/egui 0.36.1, libc and serde_json plus their transitive dependencies. Exact versions are pinned in `desktop-native/Cargo.lock`; generated license and copyright notices are included in `licenses/rust-third-party.txt`.
+
 Build downloads originate only from official GitHub releases, PyPI and GNU.
 Subscription content cannot select executable/dependency URLs or filenames.
 

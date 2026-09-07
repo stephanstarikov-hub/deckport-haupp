@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install native Desktop build dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+
+      - name: Check native Desktop client
+        run: |
+          cargo fmt --manifest-path desktop-native/Cargo.toml -- --check
+          cargo clippy --manifest-path desktop-native/Cargo.toml --locked -- -D warnings
+
+      - name: Build native Desktop client
+        run: |
+          cargo build --manifest-path desktop-native/Cargo.toml --release --locked
+          cp desktop-native/target/release/deckport-vpn-desktop desktop/deckport
+          python scripts/rust_licenses.py
+
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare bundled dependencies
+        run: python scripts/fetch_deps.py
+
+      - name: Frontend typecheck
+        run: pnpm typecheck
+
+      - name: Frontend build
+        run: pnpm build
+
+      - name: Python tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Build v2 release payload
+        run: python scripts/package.py
+
+      - name: Verify packaged v2 payload
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import tempfile
+
+          from installer.bundle import extract
+
+          root = Path(".")
+          version = json.loads(
+              (root / "package.json").read_text()
+          )["version"]
+
+          archive = (
+              root
+              / "release"
+              / f"deckport-vpn-{version}-payload.zip"
+          )
+
+          checksum = (
+              root
+              / "release"
+              / f"deckport-vpn-{version}-payload.zip.sha256"
+          )
+
+          assert archive.is_file()
+          assert checksum.is_file()
+
+          parts = checksum.read_text(
+              encoding="ascii"
+          ).split()
+
+          assert len(parts) == 2
+          assert parts[1] == archive.name
+
+          with tempfile.TemporaryDirectory() as directory:
+              manifest = extract(
+                  archive,
+                  Path(directory) / "product",
+                  parts[0],
+              )
+
+              assert manifest["version"] == version
+
+          print(
+              f"Verified installer payload: {archive.name}"
+          )
+          PY
+
+      - name: Installer syntax
+        run: bash -n install.sh
+
+      - name: Core checks
+        run: python scripts/check_core.py
+
+      - name: Linux TUN smoke
+        run: sudo unshare --net --mount --mount-proc python3 -u scripts/linux_smoke.py
