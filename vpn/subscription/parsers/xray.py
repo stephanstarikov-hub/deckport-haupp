@@ -9,7 +9,7 @@ def is_xray(data):
         return bool(data) and all(isinstance(v, dict) for v in data) and any(
             "outbounds" in v or "remarks" in v for v in data
         )
-    return isinstance(data, dict) and "outbounds" in data and "type" not in data
+    return isinstance(data, dict) and isinstance(data.get("outbounds"), list) and any(isinstance(v, dict) and "protocol" in v for v in data["outbounds"])
 
 
 def _blocked(config):
