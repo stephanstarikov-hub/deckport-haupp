@@ -680,9 +680,17 @@ impl DeckPortApp {
             let button = egui::Button::new(
                 egui::RichText::new(format!("{icon}   {label}"))
                     .size(15.0)
-                    .color(if selected { egui::Color32::WHITE } else { muted }),
+                    .color(if selected {
+                        egui::Color32::WHITE
+                    } else {
+                        muted
+                    }),
             )
-            .fill(if selected { active } else { egui::Color32::TRANSPARENT })
+            .fill(if selected {
+                active
+            } else {
+                egui::Color32::TRANSPARENT
+            })
             .stroke(egui::Stroke::new(
                 1.0,
                 if selected {
@@ -716,17 +724,11 @@ impl DeckPortApp {
 
     fn ui_feedback(&mut self, ui: &mut egui::Ui) {
         if !self.error.is_empty() {
-            ui.colored_label(
-                egui::Color32::from_rgb(255, 126, 144),
-                &self.error,
-            );
+            ui.colored_label(egui::Color32::from_rgb(255, 126, 144), &self.error);
             ui.add_space(6.0);
         }
         if !self.notice.is_empty() {
-            ui.colored_label(
-                egui::Color32::from_rgb(100, 240, 167),
-                &self.notice,
-            );
+            ui.colored_label(egui::Color32::from_rgb(100, 240, 167), &self.notice);
             ui.add_space(6.0);
         }
     }
@@ -765,10 +767,7 @@ impl DeckPortApp {
             .to_string();
 
         ui.heading(egui::RichText::new("VPN").size(26.0).strong());
-        ui.label(
-            egui::RichText::new("One tap to secure your Steam Deck connection.")
-                .color(muted),
-        );
+        ui.label(egui::RichText::new("One tap to secure your Steam Deck connection.").color(muted));
         ui.add_space(16.0);
 
         ui.columns(2, |columns| {
@@ -792,11 +791,8 @@ impl DeckPortApp {
                     egui::Color32::from_rgb(77, 101, 119)
                 };
 
-                ui.painter().circle_filled(
-                    center,
-                    84.0,
-                    egui::Color32::from_rgb(8, 27, 24),
-                );
+                ui.painter()
+                    .circle_filled(center, 84.0, egui::Color32::from_rgb(8, 27, 24));
                 ui.painter()
                     .circle_stroke(center, 86.0, egui::Stroke::new(2.0, ring));
                 ui.painter().text(
@@ -814,15 +810,8 @@ impl DeckPortApp {
                             "CONNECTING" | "RECONNECTING" | "DISCONNECTING" | "ERROR"
                         )
                     {
-                        self.request_mutation(
-                            "disconnect",
-                            vec![],
-                            "VPN disconnected",
-                            false,
-                        );
-                    } else if let Some(id) =
-                        self.selected_server_id().map(str::to_owned)
-                    {
+                        self.request_mutation("disconnect", vec![], "VPN disconnected", false);
+                    } else if let Some(id) = self.selected_server_id().map(str::to_owned) {
                         self.request_mutation(
                             "connect",
                             vec![json!(id)],
@@ -846,9 +835,7 @@ impl DeckPortApp {
                     .color(if connected { green } else { muted }),
                 );
 
-                if let Some(since) =
-                    self.status.get("since").and_then(Value::as_i64)
-                {
+                if let Some(since) = self.status.get("since").and_then(Value::as_i64) {
                     ui.label(
                         egui::RichText::new(elapsed_label(since))
                             .size(13.0)
@@ -875,9 +862,7 @@ impl DeckPortApp {
                 .fill(panel)
                 .stroke(egui::Stroke::new(1.0, border))
                 .show(right, |ui| {
-                    ui.label(
-                        egui::RichText::new("Connection").size(17.0).strong(),
-                    );
+                    ui.label(egui::RichText::new("Connection").size(17.0).strong());
                     ui.add_space(8.0);
                     for (key, value) in [
                         ("State", state.replace('_', " ")),
@@ -903,11 +888,7 @@ impl DeckPortApp {
                 .fill(panel)
                 .stroke(egui::Stroke::new(1.0, border))
                 .show(right, |ui| {
-                    ui.label(
-                        egui::RichText::new("Quick Actions")
-                            .size(17.0)
-                            .strong(),
-                    );
+                    ui.label(egui::RichText::new("Quick Actions").size(17.0).strong());
                     ui.add_space(8.0);
 
                     if ui
@@ -1640,21 +1621,15 @@ impl eframe::App for DeckPortApp {
             visuals.selection.bg_fill = egui::Color32::from_rgb(22, 88, 61);
             visuals.selection.stroke =
                 egui::Stroke::new(1.0, egui::Color32::from_rgb(61, 240, 149));
-            visuals.widgets.inactive.bg_fill =
-                egui::Color32::from_rgb(14, 34, 48);
-            visuals.widgets.hovered.bg_fill =
-                egui::Color32::from_rgb(17, 48, 64);
-            visuals.widgets.active.bg_fill =
-                egui::Color32::from_rgb(18, 71, 51);
+            visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(14, 34, 48);
+            visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(17, 48, 64);
+            visuals.widgets.active.bg_fill = egui::Color32::from_rgb(18, 71, 51);
         }
 
         ui.horizontal(|ui| {
             egui::Frame::group(ui.style())
                 .fill(egui::Color32::from_rgb(7, 20, 30))
-                .stroke(egui::Stroke::new(
-                    1.0,
-                    egui::Color32::from_rgb(18, 43, 59),
-                ))
+                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(18, 43, 59)))
                 .show(ui, |ui| self.ui_header(ui));
 
             ui.add_space(12.0);

@@ -193,11 +193,15 @@ class Lifecycle(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             subscription["source_type"],
-            "file",
+            "url",
         )
         self.assertEqual(
             subscription["source"],
-            "provider.txt",
+            "http://example.com/subscription",
+        )
+        self.assertEqual(
+            subscription["url"],
+            "http://example.com/subscription",
         )
         self.assertEqual(
             subscription["metadata"]["total"],
