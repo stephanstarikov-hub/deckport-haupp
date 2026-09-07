@@ -381,7 +381,7 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "deckport-vpn-desktop"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "eframe",
  "libc",
@@ -631,7 +631,7 @@ dependencies = [
 
 [[package]]
 name = "fax"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "caf1079563223d5d59d83c85886a56e586cfd5c1a26292e971a0fa266531ac5a"
 
