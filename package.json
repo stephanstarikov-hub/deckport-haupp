@@ -1,6 +1,6 @@
 {
     "name": "decky-vpn",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "description": "DeckPort VPN - subscription VPN inside Steam Deck Gaming Mode",
     "type": "module",
     "license": "GPL-3.0-or-later",
