@@ -42,6 +42,14 @@ jobs:
           cargo build --manifest-path desktop-native/Cargo.toml --release
           cp desktop-native/target/release/deckport-vpn-desktop desktop/deckport
 
+      - name: Upload Cargo lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lock
+          path: desktop-native/Cargo.lock
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
