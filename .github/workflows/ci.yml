@@ -47,6 +47,59 @@ jobs:
       - name: Python tests
         run: python -m unittest discover -s tests -v
 
+      - name: Build v2 release payload
+        run: python scripts/package.py
+
+      - name: Verify packaged v2 payload
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import tempfile
+
+          from installer.bundle import extract
+
+          root = Path(".")
+          version = json.loads(
+              (root / "package.json").read_text()
+          )["version"]
+
+          archive = (
+              root
+              / "release"
+              / f"deckport-vpn-{version}-payload.zip"
+          )
+
+          checksum = (
+              root
+              / "release"
+              / f"deckport-vpn-{version}-payload.zip.sha256"
+          )
+
+          assert archive.is_file()
+          assert checksum.is_file()
+
+          parts = checksum.read_text(
+              encoding="ascii"
+          ).split()
+
+          assert len(parts) == 2
+          assert parts[1] == archive.name
+
+          with tempfile.TemporaryDirectory() as directory:
+              manifest = extract(
+                  archive,
+                  Path(directory) / "product",
+                  parts[0],
+              )
+
+              assert manifest["version"] == version
+
+          print(
+              f"Verified installer payload: {archive.name}"
+          )
+          PY
+
       - name: Installer syntax
         run: bash -n install.sh
 

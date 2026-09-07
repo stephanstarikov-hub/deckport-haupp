@@ -1,0 +1,73 @@
+﻿#!/usr/bin/env python3
+import argparse
+import asyncio
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "py_modules"))
+sys.path.insert(0, str(ROOT))
+
+from vpn.ipc import Client
+
+
+async def service_action(action):
+    client = Client()
+
+    if action == "disconnect":
+        await client.call("disconnect")
+        return 0
+
+    if action == "connect":
+        status = await client.call("status")
+        selected = status.get("selected")
+        if not selected:
+            print("DeckPort VPN: no server is selected", file=sys.stderr)
+            return 2
+        await client.call("connect", selected)
+        return 0
+
+    return 0
+
+
+def gui(open_setup=False):
+    from PySide6.QtWidgets import QApplication
+    from desktop.app import DesktopWindow
+
+    app = QApplication(sys.argv[:1])
+    app.setApplicationName("DeckPort VPN")
+
+    window = DesktopWindow(ROOT)
+    window.show()
+
+    if open_setup:
+        window.open_setup()
+
+    return app.exec()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--connect", action="store_true")
+    group.add_argument("--disconnect", action="store_true")
+    group.add_argument("--setup", action="store_true")
+    args = parser.parse_args()
+
+    try:
+        if args.connect:
+            return asyncio.run(service_action("connect"))
+        if args.disconnect:
+            return asyncio.run(service_action("disconnect"))
+        return gui(open_setup=args.setup)
+    except Exception:
+        print(
+            "DeckPort VPN could not contact its service. "
+            "Open Setup and choose Repair.",
+            file=sys.stderr,
+        )
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

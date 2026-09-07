@@ -120,7 +120,7 @@ class DesktopWindow(QMainWindow):
         channels.addWidget(self.channel)
         channels.addStretch()
         layout.addLayout(channels)
-        layout.addWidget(button("Open Setup / check updates", self.open_setup))
+        layout.addWidget(button("Open Setup / repair", self.open_setup))
         layout.addWidget(button("Refresh safe diagnostics", self.diagnostics))
         self.diagnostic_text = QPlainTextEdit()
         self.diagnostic_text.setReadOnly(True)
