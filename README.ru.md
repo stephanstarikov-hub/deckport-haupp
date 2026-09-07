@@ -21,7 +21,7 @@
   <img alt="Decky Loader" src="https://img.shields.io/badge/Decky_Loader-supported-1a9fff?style=flat-square" />
   <img alt="sing-box" src="https://img.shields.io/badge/sing--box-1.14.0-3aa675?style=flat-square" />
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0+-blue?style=flat-square" />
-  <img alt="Status" src="https://img.shields.io/badge/status-preview-orange?style=flat-square" />
+  <img alt="Status" src="https://img.shields.io/badge/status-stable-48b982?style=flat-square" />
 </p>
 
 ---
@@ -36,7 +36,8 @@ DeckPort VPN — VPN-клиент с открытым исходным кодо�
 
 Репозиторий проекта: **deckport-haupp**
 
-> DeckPort VPN 0.2.x пока находится в статусе preview.
+> DeckPort VPN 0.2.4 — первый стабильный Desktop-релиз. Автоматические Linux-тесты
+> не заменяют отдельный acceptance checklist для Steam Deck LCD и OLED.
 
 ## Возможности
 
@@ -60,7 +61,8 @@ DeckPort VPN также включает клиент для Desktop Mode.
 
 Он работает через тот же системный демон, что и Decky-плагин. Поэтому подписки, выбранный сервер и состояние подключения общие для Gaming Mode и Desktop Mode.
 
-Desktop-интеграция в ветке 0.2.x пока считается preview-функцией.
+Нативный Desktop-клиент поддерживает состояние VPN, подписки, поиск серверов,
+проверку задержки, избранное, настройки, диагностику и доступ к Setup.
 
 ### Поддерживаемые протоколы
 
@@ -118,13 +120,13 @@ DeckPort VPN 0.2.x использует постоянный системный 
 - интернет во время установки
 - поддерживаемая VPN-подписка
 
-### Установка 0.2.3
+### Установка 0.2.4
 
 Откройте Konsole в Desktop Mode:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.3/install.sh -o /tmp/deckport-install.sh
-bash /tmp/deckport-install.sh --version 0.2.3
+curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.4/install.sh -o /tmp/deckport-install.sh
+bash /tmp/deckport-install.sh --version 0.2.4
 ```
 
 Установщик:
@@ -164,7 +166,7 @@ DeckPort VPN поддерживает удалённые и локальные �
 
 ### Подписки по URL
 
-Через интерфейс Decky можно добавить HTTP или HTTPS URL провайдера.
+HTTP или HTTPS URL провайдера можно добавить через Decky или Desktop Mode.
 
 Подписки можно:
 
@@ -231,7 +233,7 @@ DeckPort разделяет состояние VPN-туннеля и внешн�
           +-----------+-----------+
           |                       |
      Decky Loader UI        Desktop Mode UI
-       Gaming Mode               preview
+       Gaming Mode                native
           |                       |
           +-----------+-----------+
                       |
@@ -379,7 +381,7 @@ GitHub Actions уже явно использует pnpm 9.
 - [x] проверка release payload
 - [x] Linux IPC integration tests
 - [x] Linux TUN smoke tests
-- [x] preview-клиент для Desktop Mode
+- [x] полноценный нативный клиент для Desktop Mode
 
 Возможные будущие улучшения:
 

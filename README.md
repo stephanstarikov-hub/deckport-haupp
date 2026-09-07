@@ -21,7 +21,7 @@
   <img alt="Decky Loader" src="https://img.shields.io/badge/Decky_Loader-supported-1a9fff?style=flat-square" />
   <img alt="sing-box" src="https://img.shields.io/badge/sing--box-1.14.0-3aa675?style=flat-square" />
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0+-blue?style=flat-square" />
-  <img alt="Status" src="https://img.shields.io/badge/status-preview-orange?style=flat-square" />
+  <img alt="Status" src="https://img.shields.io/badge/status-stable-48b982?style=flat-square" />
 </p>
 
 ---
@@ -36,7 +36,8 @@ Starting with the 0.2.x architecture, the VPN process is owned by a persistent s
 
 Repository: **deckport-haupp**
 
-> DeckPort VPN 0.2.x is currently preview software.
+> DeckPort VPN 0.2.4 is the first stable Desktop release. Automated Linux coverage
+> does not replace the separate LCD and OLED Steam Deck acceptance checklist.
 
 ## Features
 
@@ -60,7 +61,8 @@ DeckPort VPN also includes a Desktop Mode client.
 
 It communicates with the same system daemon as the Decky plugin, so subscriptions, selected server and connection state are shared between Gaming Mode and Desktop Mode.
 
-Desktop integration is still considered preview functionality in the 0.2.x release series.
+The native Desktop client provides VPN status, subscriptions, server search,
+latency checks, favorites, settings, diagnostics and Setup access.
 
 ### Supported protocols
 
@@ -117,13 +119,13 @@ Closing Decky or the Desktop application does not intentionally terminate an act
 - internet access during installation
 - a supported VPN subscription
 
-### Install 0.2.3
+### Install 0.2.4
 
 Open Konsole in Desktop Mode:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.3/install.sh -o /tmp/deckport-install.sh
-bash /tmp/deckport-install.sh --version 0.2.3
+curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.4/install.sh -o /tmp/deckport-install.sh
+bash /tmp/deckport-install.sh --version 0.2.4
 ```
 
 The installer:
@@ -163,7 +165,7 @@ DeckPort VPN supports remote and local subscriptions.
 
 ### URL subscriptions
 
-Add an HTTP or HTTPS provider URL through the Decky interface.
+Add an HTTP or HTTPS provider URL through either Decky or Desktop Mode.
 
 Subscriptions can be:
 
@@ -230,7 +232,7 @@ Public-IP verification is informational.
           +-----------+-----------+
           |                       |
     Decky Loader UI         Desktop Mode UI
-     Gaming Mode               preview
+     Gaming Mode                native
           |                       |
           +-----------+-----------+
                       |
@@ -378,7 +380,7 @@ Implemented:
 - [x] release payload verification
 - [x] Linux IPC integration tests
 - [x] Linux TUN smoke tests
-- [x] Desktop Mode client preview
+- [x] full native Desktop Mode client
 
 Possible future work:
 

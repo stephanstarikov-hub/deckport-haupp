@@ -51,15 +51,16 @@ impl SetupState {
     }
 
     fn poll(&mut self) {
-        let result = self.receiver.as_ref().and_then(|receiver| {
-            match receiver.try_recv() {
+        let result = self
+            .receiver
+            .as_ref()
+            .and_then(|receiver| match receiver.try_recv() {
                 Ok(result) => Some(result),
                 Err(TryRecvError::Empty) => None,
-                Err(TryRecvError::Disconnected) => Some(Err(
-                    "Setup operation ended unexpectedly".to_string(),
-                )),
-            }
-        });
+                Err(TryRecvError::Disconnected) => {
+                    Some(Err("Setup operation ended unexpectedly".to_string()))
+                }
+            });
 
         let Some(result) = result else {
             return;
@@ -74,8 +75,7 @@ impl SetupState {
                 self.output = message;
             }
             Err(message) => {
-                self.status =
-                    "Setup could not complete the operation.".to_string();
+                self.status = "Setup could not complete the operation.".to_string();
                 self.output = message;
             }
         }
@@ -87,7 +87,7 @@ impl SetupState {
         ui.heading("DeckPort VPN Setup");
         ui.label(format!(
             "Installed application version: {}",
-            env!("CARGO_PKG_VERSION")
+            env!("DECKPORT_VERSION")
         ));
 
         ui.add_space(8.0);
@@ -102,20 +102,14 @@ impl SetupState {
 
         ui.horizontal(|ui| {
             if ui
-                .add_enabled(
-                    !self.busy,
-                    egui::Button::new("Repair installation"),
-                )
+                .add_enabled(!self.busy, egui::Button::new("Repair installation"))
                 .clicked()
             {
                 self.start("repair");
             }
 
             if ui
-                .add_enabled(
-                    !self.busy,
-                    egui::Button::new("Uninstall"),
-                )
+                .add_enabled(!self.busy, egui::Button::new("Uninstall"))
                 .clicked()
             {
                 self.confirm_uninstall = true;
@@ -124,9 +118,7 @@ impl SetupState {
 
         if self.confirm_uninstall && !self.busy {
             ui.separator();
-            ui.label(
-                "Remove DeckPort VPN system components? Saved settings are kept."
-            );
+            ui.label("Remove DeckPort VPN system components? Saved settings are kept.");
 
             ui.horizontal(|ui| {
                 if ui.button("Confirm uninstall").clicked() {
@@ -143,9 +135,7 @@ impl SetupState {
 
         egui::ScrollArea::vertical().show(ui, |ui| {
             if self.output.is_empty() {
-                ui.label(
-                    "Setup progress and safe installation messages appear here."
-                );
+                ui.label("Setup progress and safe installation messages appear here.");
             } else {
                 ui.label(&self.output);
             }
@@ -179,16 +169,12 @@ fn current_release() -> Result<PathBuf, String> {
     Ok(release)
 }
 
-fn repair_files(
-    release: &Path,
-) -> Result<(PathBuf, String), String> {
+fn repair_files(release: &Path) -> Result<(PathBuf, String), String> {
     let payload = release.join("payload.zip");
     let checksum = release.join("payload.sha256");
 
     if !payload.is_file() || !checksum.is_file() {
-        return Err(
-            "The installed repair payload is incomplete".to_string()
-        );
+        return Err("The installed repair payload is incomplete".to_string());
     }
 
     let digest = fs::read_to_string(checksum)
@@ -196,12 +182,8 @@ fn repair_files(
         .trim()
         .to_ascii_lowercase();
 
-    if digest.len() != 64
-        || !digest.bytes().all(|byte| byte.is_ascii_hexdigit())
-    {
-        return Err(
-            "The installed payload checksum is invalid".to_string()
-        );
+    if digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("The installed payload checksum is invalid".to_string());
     }
 
     Ok((payload, digest))
@@ -250,13 +232,8 @@ fn run_installer(action: &str) -> Result<String, String> {
             continue;
         };
 
-        if let Some(progress) =
-            item.get("progress").and_then(Value::as_u64)
-        {
-            let message = item
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or("");
+        if let Some(progress) = item.get("progress").and_then(Value::as_u64) {
+            let message = item.get("message").and_then(Value::as_str).unwrap_or("");
 
             messages.push(format!("{progress}%  {message}"));
         }
@@ -280,8 +257,6 @@ fn run_installer(action: &str) -> Result<String, String> {
             Ok(messages.join("\n"))
         }
     } else {
-        Err(failure.unwrap_or_else(|| {
-            "Installation operation did not complete".to_string()
-        }))
+        Err(failure.unwrap_or_else(|| "Installation operation did not complete".to_string()))
     }
 }

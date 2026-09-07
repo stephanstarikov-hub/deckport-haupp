@@ -2,6 +2,7 @@ node_modules/
 .pnpm-store/
 dist/
 release/
+desktop-native/target/
 .cache/
 __pycache__/
 *.pyc

@@ -76,17 +76,21 @@ def main():
         for notice in notices:
             output.append("")
             output.append(f"--- {notice.name} ---")
+            content = notice.read_text(
+                encoding="utf-8",
+                errors="replace",
+            )
             output.append(
-                notice.read_text(
-                    encoding="utf-8",
-                    errors="replace",
+                "\n".join(
+                    line.rstrip()
+                    for line in content.splitlines()
                 ).rstrip()
             )
 
         output.append("")
 
     OUTPUT.write_text(
-        "\n".join(output) + "\n",
+        "\n".join(output).rstrip() + "\n",
         encoding="utf-8",
     )
 
