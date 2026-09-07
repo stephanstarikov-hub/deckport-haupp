@@ -1,0 +1,57 @@
+﻿name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare bundled dependencies
+        run: python scripts/fetch_deps.py
+
+      - name: Frontend typecheck
+        run: pnpm typecheck
+
+      - name: Frontend build
+        run: pnpm build
+
+      - name: Python tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Installer syntax
+        run: bash -n install.sh
+
+      - name: Core checks
+        run: python scripts/check_core.py
+
+      - name: Linux TUN smoke
+        run: sudo unshare --net --mount --mount-proc python3 -u scripts/linux_smoke.py

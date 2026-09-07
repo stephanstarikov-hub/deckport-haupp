@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import tempfile
 import uuid
@@ -159,7 +160,20 @@ class Transaction:
     def save_file(self, record, path):
         if path.is_symlink():
             raise ValueError("Unsafe managed file")
-        record["files"].append({"path": str(path), "data": read_regular(path, 4 * 1024 * 1024).hex() if path.exists() else None})
+
+        if path.exists():
+            info = path.stat()
+            data = read_regular(path, 4 * 1024 * 1024).hex()
+            mode = stat.S_IMODE(info.st_mode)
+        else:
+            data = None
+            mode = None
+
+        record["files"].append({
+            "path": str(path),
+            "data": data,
+            "mode": mode,
+        })
         self.write_file(self.journal, json.dumps(record).encode(), 0o600)
 
     def rollback(self, record):
@@ -173,7 +187,11 @@ class Transaction:
             if item["data"] is None:
                 path.unlink(missing_ok=True)
             else:
-                self.write_file(path, bytes.fromhex(item["data"]))
+                self.write_file(
+                    path,
+                    bytes.fromhex(item["data"]),
+                    item.get("mode") or 0o644,
+                )
         for item in reversed(record.get("user_files", [])):
             with directory(Path(item["path"]).parent) as fd:
                 if item["data"] is None:
