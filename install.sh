@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 repo='stephanstarikov-hub/deckport-haupp'
-version='0.2.6'
+version='0.2.7'
 
 while (($#)); do
   case "$1" in
@@ -26,7 +26,7 @@ while (($#)); do
     --help|-h)
       printf '%s\n' \
         'DeckPort VPN installer' \
-        'Usage: bash install.sh [--repo OWNER/REPO] [--version 0.2.6]'
+        'Usage: bash install.sh [--repo OWNER/REPO] [--version 0.2.7]'
       exit 0
       ;;
     *)

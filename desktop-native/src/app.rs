@@ -648,6 +648,7 @@ impl DeckPortApp {
     }
 
     fn ui_header(&mut self, ui: &mut egui::Ui) {
+        ui.vertical(|ui| {
         let green = egui::Color32::from_rgb(61, 240, 149);
         let muted = egui::Color32::from_rgb(143, 163, 183);
         let active = egui::Color32::from_rgb(16, 40, 58);
@@ -719,6 +720,7 @@ impl DeckPortApp {
                     .size(11.0)
                     .color(green),
             );
+        });
         });
     }
 

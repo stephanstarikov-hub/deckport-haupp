@@ -1,6 +1,6 @@
-# DeckPort VPN 0.2.6
+# DeckPort VPN 0.2.7
 
-DeckPort VPN 0.2.6 focuses on a smoother Steam Deck install/update experience, broader subscription-link handling, and a redesigned native Desktop client.
+DeckPort VPN 0.2.7 focuses on a smoother Steam Deck install/update experience, broader subscription-link handling, and a redesigned native Desktop client.
 
 Highlights:
 
