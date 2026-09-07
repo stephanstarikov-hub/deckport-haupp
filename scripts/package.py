@@ -150,7 +150,14 @@ def write_legacy_decky_zip(output, version, files):
 
 
 def write_source(output, version):
-    archive = output / f"decky-vpn-{version}-source.zip"
+    archive = output / f"deckport-vpn-v{version}-source.zip"
+
+    def add_source(zipped, path, name):
+        mode = 0o755 if path.name == "install.sh" else 0o644
+        zipped.writestr(
+            zip_info(name, mode),
+            path.read_bytes(),
+        )
 
     with zipfile.ZipFile(
         archive,
@@ -170,12 +177,20 @@ def write_source(output, version):
             "desktop-native",
             "assets",
         ):
-            for path in (ROOT / name).rglob("*"):
-                if path.is_file() and "__pycache__" not in path.parts:
-                    zipped.write(
+            for path in sorted(
+                (ROOT / name).rglob("*"),
+                key=lambda item: item.as_posix(),
+            ):
+                relative = path.relative_to(ROOT)
+                if path.is_file() and not any(
+                    part in {"__pycache__", "target"}
+                    for part in relative.parts
+                ):
+                    add_source(
+                        zipped,
                         path,
-                        "decky-vpn/"
-                        + path.relative_to(ROOT).as_posix(),
+                        "deckport-vpn/"
+                        + relative.as_posix(),
                     )
 
         for name in (
@@ -194,16 +209,21 @@ def write_source(output, version):
             ".gitattributes",
             ".gitignore",
         ):
-            zipped.write(
+            add_source(
+                zipped,
                 ROOT / name,
-                "decky-vpn/" + name,
+                "deckport-vpn/" + name,
             )
 
         for package in ("@decky/api", "@decky/ui"):
             source = ROOT / "node_modules" / package / "src"
-            for path in source.rglob("*"):
+            for path in sorted(
+                source.rglob("*"),
+                key=lambda item: item.as_posix(),
+            ):
                 if path.is_file():
-                    zipped.write(
+                    add_source(
+                        zipped,
                         path,
                         "upstream/"
                         + package
@@ -211,14 +231,18 @@ def write_source(output, version):
                         + path.relative_to(source).as_posix(),
                     )
 
-        zipped.write(
+        add_source(
+            zipped,
             ROOT / ".cache/sing-box-1.14.0-source.tar.gz",
             "upstream/sing-box-1.14.0-source.tar.gz",
         )
-        zipped.write(
+        add_source(
+            zipped,
             ROOT / ".cache/pyyaml-6.0.3.tar.gz",
             "upstream/pyyaml-6.0.3.tar.gz",
         )
+
+    return archive
 
 
 def main():
@@ -294,7 +318,7 @@ def main():
         files,
     )
 
-    write_source(
+    source = write_source(
         output,
         version,
     )
@@ -305,6 +329,10 @@ def main():
     print(
         f"Created {payload.name} "
         f"({payload.stat().st_size / 1048576:.1f} MiB)"
+    )
+    print(
+        f"Created {source.name} "
+        f"({source.stat().st_size / 1048576:.1f} MiB)"
     )
     print(
         f"Payload SHA256 {digest}"

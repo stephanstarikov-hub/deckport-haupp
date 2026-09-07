@@ -2,8 +2,10 @@ import os
 import json
 from pathlib import Path
 import stat
+import subprocess
 import tempfile
 import unittest
+import zipfile
 
 from installer.bundle import extract
 from scripts import package as packaging
@@ -21,6 +23,18 @@ VERSION = json.loads(
     "requires fetched dependencies and frontend build",
 )
 class PackageV2(unittest.TestCase):
+    @unittest.skipUnless(
+        os.name == "posix",
+        "native Desktop binary requires Linux",
+    )
+    def test_desktop_binary_reports_release_version(self):
+        output = subprocess.check_output(
+            [ROOT / "desktop/deckport", "--version"],
+            text=True,
+        ).strip()
+
+        self.assertEqual(output, f"DeckPort VPN {VERSION}")
+
     def test_generated_payload_is_accepted_by_installer(self):
         files = packaging.collect_product_files()
 
@@ -177,6 +191,36 @@ class PackageV2(unittest.TestCase):
             self.assertEqual(
                 stat.S_IMODE(new_daemon.stat().st_mode),
                 0o644,
+            )
+
+    def test_source_archive_excludes_cargo_build_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            archive = packaging.write_source(
+                Path(directory),
+                VERSION,
+            )
+
+            with zipfile.ZipFile(archive) as source:
+                names = source.namelist()
+                timestamps = {
+                    item.date_time
+                    for item in source.infolist()
+                }
+
+            self.assertIn(
+                "deckport-vpn/desktop-native/src/app.rs",
+                names,
+            )
+            self.assertIn(
+                "deckport-vpn/desktop-native/build.rs",
+                names,
+            )
+            self.assertFalse(
+                any("/desktop-native/target/" in name for name in names)
+            )
+            self.assertEqual(
+                timestamps,
+                {(2026, 9, 6, 0, 0, 0)},
             )
 
 if __name__ == "__main__":
