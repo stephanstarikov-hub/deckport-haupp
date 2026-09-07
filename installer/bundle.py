@@ -25,7 +25,7 @@ def safe_name(name):
     return path
 
 
-def extract(archive, destination, expected):
+def extract(archive, destination, expected, reuse_from=None):
     if not re.fullmatch(r"[a-f0-9]{64}", expected) or archive.stat().st_size > MAX_ARCHIVE or digest_file(archive) != expected:
         raise ValueError("Payload integrity check failed")
     destination.mkdir(mode=0o755)
@@ -47,19 +47,81 @@ def extract(archive, destination, expected):
             raise ValueError("Incomplete payload")
         if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?", manifest["version"]):
             raise ValueError("Invalid product version")
+        reuse_root = (
+            Path(reuse_from)
+            if reuse_from is not None
+            else None
+        )
+
         for entry in entries:
-            target = destination.joinpath(*safe_name(entry.filename).parts)
-            target.parent.mkdir(parents=True, exist_ok=True, mode=0o755)
-            with source.open(entry) as incoming, target.open("xb") as output:
-                shutil.copyfileobj(incoming, output, 1024 * 1024)
-                output.flush()
-                os.fsync(output.fileno())
+            target = destination.joinpath(
+                *safe_name(entry.filename).parts
+            )
+            target.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+                mode=0o755,
+            )
+
             mode = stat.S_IMODE(entry.external_attr >> 16)
-            target.chmod(mode)
+            reused = False
+            record = None
+
             if entry.filename != "payload.json":
                 record = manifest["files"][entry.filename]
-                if record != {"sha256": digest_file(target), "mode": mode}:
-                    raise ValueError("Payload file integrity check failed")
+
+                if record.get("mode") != mode:
+                    raise ValueError(
+                        "Payload file integrity check failed"
+                    )
+
+                if reuse_root is not None:
+                    candidate = reuse_root.joinpath(
+                        *safe_name(entry.filename).parts
+                    )
+
+                    try:
+                        info = candidate.stat(
+                            follow_symlinks=False
+                        )
+
+                        if (
+                            stat.S_ISREG(info.st_mode)
+                            and stat.S_IMODE(info.st_mode) == mode
+                            and digest_file(candidate)
+                            == record["sha256"]
+                        ):
+                            os.link(
+                                candidate,
+                                target,
+                                follow_symlinks=False,
+                            )
+                            reused = True
+                    except (FileNotFoundError, OSError):
+                        pass
+
+            if not reused:
+                with source.open(entry) as incoming, target.open(
+                    "xb"
+                ) as output:
+                    shutil.copyfileobj(
+                        incoming,
+                        output,
+                        1024 * 1024,
+                    )
+                    output.flush()
+                    os.fsync(output.fileno())
+
+                target.chmod(mode)
+
+            if entry.filename != "payload.json":
+                if record != {
+                    "sha256": digest_file(target),
+                    "mode": mode,
+                }:
+                    raise ValueError(
+                        "Payload file integrity check failed"
+                    )
         # Directory creation is affected by the installer's restrictive
         # umask. Product directories contain immutable application files
         # and must be traversable by the unprivileged Desktop application.

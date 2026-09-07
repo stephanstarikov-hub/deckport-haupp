@@ -116,6 +116,68 @@ class PackageV2(unittest.TestCase):
                     0o755,
                 )
 
+    @unittest.skipUnless(
+        os.name == "posix",
+        "hardlink reuse requires POSIX filesystem semantics",
+    )
+    def test_update_reuses_unchanged_files_with_hardlinks(self):
+        files = packaging.collect_product_files()
+
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            output = directory / "release"
+            output.mkdir()
+
+            archive, digest = packaging.write_v2_payload(
+                output,
+                VERSION,
+                files,
+            )
+
+            previous = directory / "previous"
+            extract(
+                archive,
+                previous,
+                digest,
+            )
+
+            old_sing = previous / "backend/bin/sing-box"
+            old_daemon = previous / "daemon-entry.py"
+
+            old_sing_inode = old_sing.stat().st_ino
+            old_daemon_inode = old_daemon.stat().st_ino
+
+            # A mode mismatch must prevent reuse.
+            old_daemon.chmod(0o755)
+
+            updated = directory / "updated"
+            extract(
+                archive,
+                updated,
+                digest,
+                reuse_from=previous,
+            )
+
+            new_sing = updated / "backend/bin/sing-box"
+            new_daemon = updated / "daemon-entry.py"
+
+            self.assertEqual(
+                old_sing_inode,
+                new_sing.stat().st_ino,
+            )
+            self.assertGreaterEqual(
+                new_sing.stat().st_nlink,
+                2,
+            )
+
+            self.assertNotEqual(
+                old_daemon_inode,
+                new_daemon.stat().st_ino,
+            )
+            self.assertEqual(
+                stat.S_IMODE(new_daemon.stat().st_mode),
+                0o644,
+            )
 
 if __name__ == "__main__":
     unittest.main()

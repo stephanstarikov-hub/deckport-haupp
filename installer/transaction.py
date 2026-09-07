@@ -256,7 +256,7 @@ class Transaction:
                 incoming.write_bytes(read_regular(archive, 600 * 1024 * 1024))
                 self.stage = "bundle-validation"
                 self.progress(15, "Checking bundled files and permissions")
-                manifest = extract(incoming, work / "product", expected)
+                manifest = extract(incoming, work / "product", expected, reuse_from=previous)
 
                 self.stage = "release-staging"
                 release = self.base / "releases" / (
