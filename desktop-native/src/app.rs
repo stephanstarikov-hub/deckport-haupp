@@ -649,78 +649,78 @@ impl DeckPortApp {
 
     fn ui_header(&mut self, ui: &mut egui::Ui) {
         ui.vertical(|ui| {
-        let green = egui::Color32::from_rgb(61, 240, 149);
-        let muted = egui::Color32::from_rgb(143, 163, 183);
-        let active = egui::Color32::from_rgb(16, 40, 58);
+            let green = egui::Color32::from_rgb(61, 240, 149);
+            let muted = egui::Color32::from_rgb(143, 163, 183);
+            let active = egui::Color32::from_rgb(16, 40, 58);
 
-        ui.set_width(205.0);
-        ui.set_min_height(ui.available_height());
-        ui.add_space(10.0);
+            ui.set_width(205.0);
+            ui.set_min_height(ui.available_height());
+            ui.add_space(10.0);
 
-        ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("DP").size(22.0).strong().color(green));
-            ui.vertical(|ui| {
-                ui.label(egui::RichText::new("DeckPort").size(22.0).strong());
-                ui.label(
-                    egui::RichText::new("Your Privacy. Your Way.")
-                        .size(11.0)
-                        .color(muted),
-                );
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("DP").size(22.0).strong().color(green));
+                ui.vertical(|ui| {
+                    ui.label(egui::RichText::new("DeckPort").size(22.0).strong());
+                    ui.label(
+                        egui::RichText::new("Your Privacy. Your Way.")
+                            .size(11.0)
+                            .color(muted),
+                    );
+                });
             });
-        });
 
-        ui.add_space(34.0);
+            ui.add_space(34.0);
 
-        for (page, icon, label) in [
-            (Page::Vpn, "H", "Home"),
-            (Page::Servers, "S", "Servers"),
-            (Page::Subscriptions, "L", "Subscriptions"),
-            (Page::Settings, "C", "Settings"),
-        ] {
-            let selected = self.page == page;
-            let button = egui::Button::new(
-                egui::RichText::new(format!("{icon}   {label}"))
-                    .size(15.0)
-                    .color(if selected {
-                        egui::Color32::WHITE
-                    } else {
-                        muted
-                    }),
-            )
-            .fill(if selected {
-                active
-            } else {
-                egui::Color32::TRANSPARENT
-            })
-            .stroke(egui::Stroke::new(
-                1.0,
-                if selected {
-                    egui::Color32::from_rgb(27, 65, 84)
+            for (page, icon, label) in [
+                (Page::Vpn, "H", "Home"),
+                (Page::Servers, "S", "Servers"),
+                (Page::Subscriptions, "L", "Subscriptions"),
+                (Page::Settings, "C", "Settings"),
+            ] {
+                let selected = self.page == page;
+                let button = egui::Button::new(
+                    egui::RichText::new(format!("{icon}   {label}"))
+                        .size(15.0)
+                        .color(if selected {
+                            egui::Color32::WHITE
+                        } else {
+                            muted
+                        }),
+                )
+                .fill(if selected {
+                    active
                 } else {
                     egui::Color32::TRANSPARENT
-                },
-            ))
-            .min_size(egui::vec2(185.0, 44.0));
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if selected {
+                        egui::Color32::from_rgb(27, 65, 84)
+                    } else {
+                        egui::Color32::TRANSPARENT
+                    },
+                ))
+                .min_size(egui::vec2(185.0, 44.0));
 
-            if ui.add(button).clicked() {
-                self.page = page;
+                if ui.add(button).clicked() {
+                    self.page = page;
+                }
+                ui.add_space(3.0);
             }
-            ui.add_space(3.0);
-        }
 
-        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-            ui.add_space(10.0);
-            ui.label(
-                egui::RichText::new(format!("v{VERSION}"))
-                    .size(11.0)
-                    .color(egui::Color32::from_rgb(96, 118, 140)),
-            );
-            ui.label(
-                egui::RichText::new("Core connected")
-                    .size(11.0)
-                    .color(green),
-            );
-        });
+            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+                ui.add_space(10.0);
+                ui.label(
+                    egui::RichText::new(format!("v{VERSION}"))
+                        .size(11.0)
+                        .color(egui::Color32::from_rgb(96, 118, 140)),
+                );
+                ui.label(
+                    egui::RichText::new("Core connected")
+                        .size(11.0)
+                        .color(green),
+                );
+            });
         });
     }
 
