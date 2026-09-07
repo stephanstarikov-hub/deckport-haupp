@@ -657,7 +657,7 @@ impl DeckPortApp {
         ui.add_space(10.0);
 
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("◆").size(28.0).strong().color(green));
+            ui.label(egui::RichText::new("DP").size(22.0).strong().color(green));
             ui.vertical(|ui| {
                 ui.label(egui::RichText::new("DeckPort").size(22.0).strong());
                 ui.label(
@@ -671,10 +671,10 @@ impl DeckPortApp {
         ui.add_space(34.0);
 
         for (page, icon, label) in [
-            (Page::Vpn, "⌂", "Home"),
-            (Page::Servers, "◉", "Servers"),
-            (Page::Subscriptions, "↗", "Subscriptions"),
-            (Page::Settings, "⚙", "Settings"),
+            (Page::Vpn, "H", "Home"),
+            (Page::Servers, "S", "Servers"),
+            (Page::Subscriptions, "L", "Subscriptions"),
+            (Page::Settings, "C", "Settings"),
         ] {
             let selected = self.page == page;
             let button = egui::Button::new(
@@ -715,7 +715,7 @@ impl DeckPortApp {
                     .color(egui::Color32::from_rgb(96, 118, 140)),
             );
             ui.label(
-                egui::RichText::new("●  Connected to core")
+                egui::RichText::new("Core connected")
                     .size(11.0)
                     .color(green),
             );
@@ -774,7 +774,7 @@ impl DeckPortApp {
             columns[0].vertical_centered(|ui| {
                 ui.label(
                     egui::RichText::new(if connected {
-                        "🔒  Secure Connection"
+                        "Secure connection"
                     } else {
                         "Connection ready"
                     })
@@ -795,12 +795,17 @@ impl DeckPortApp {
                     .circle_filled(center, 84.0, egui::Color32::from_rgb(8, 27, 24));
                 ui.painter()
                     .circle_stroke(center, 86.0, egui::Stroke::new(2.0, ring));
-                ui.painter().text(
-                    center,
-                    egui::Align2::CENTER_CENTER,
-                    "⏻",
-                    egui::FontId::proportional(56.0),
-                    ring,
+                ui.painter().circle_stroke(
+                    center + egui::vec2(0.0, 7.0),
+                    24.0,
+                    egui::Stroke::new(5.0, ring),
+                );
+                ui.painter().line_segment(
+                    [
+                        center + egui::vec2(0.0, -29.0),
+                        center + egui::vec2(0.0, 3.0),
+                    ],
+                    egui::Stroke::new(5.0, ring),
                 );
 
                 if response.clicked() && !self.action_busy {
@@ -846,7 +851,7 @@ impl DeckPortApp {
                 ui.add_space(12.0);
                 if ui
                     .add(
-                        egui::Button::new(format!("◉  {name}     ›"))
+                        egui::Button::new(format!("Server: {name}"))
                             .fill(egui::Color32::from_rgb(14, 32, 45))
                             .stroke(egui::Stroke::new(1.0, border))
                             .min_size(egui::vec2(310.0, 50.0)),
@@ -893,7 +898,7 @@ impl DeckPortApp {
 
                     if ui
                         .add(
-                            egui::Button::new("◉  Change Server")
+                            egui::Button::new("Change server")
                                 .min_size(egui::vec2(ui.available_width(), 38.0)),
                         )
                         .clicked()
@@ -905,9 +910,9 @@ impl DeckPortApp {
                         .add_enabled(
                             !self.refresh_busy,
                             egui::Button::new(if self.refresh_busy {
-                                "Refreshing…"
+                                "Refreshing..."
                             } else {
-                                "↻  Refresh status"
+                                "Refresh status"
                             })
                             .min_size(egui::vec2(ui.available_width(), 38.0)),
                         )
@@ -931,9 +936,9 @@ impl DeckPortApp {
                 .show(right, |ui| {
                     ui.label(
                         egui::RichText::new(if connected {
-                            "◆  Your connection is secure"
+                            "Your connection is secure"
                         } else {
-                            "◇  VPN is disconnected"
+                            "VPN is disconnected"
                         })
                         .strong()
                         .color(if connected { green } else { muted }),
@@ -1632,18 +1637,32 @@ impl eframe::App for DeckPortApp {
                 .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(18, 43, 59)))
                 .show(ui, |ui| self.ui_header(ui));
 
-            ui.add_space(12.0);
+            ui.add_space(16.0);
 
-            ui.vertical(|ui| {
-                self.ui_feedback(ui);
+            let available = ui.available_size();
+            ui.allocate_ui_with_layout(
+                available,
+                egui::Layout::top_down(egui::Align::Center),
+                |ui| {
+                    ui.add_space(18.0);
 
-                match self.page {
-                    Page::Vpn => self.ui_vpn(ui),
-                    Page::Servers => self.ui_servers(ui),
-                    Page::Subscriptions => self.ui_subscriptions(ui),
-                    Page::Settings => self.ui_settings(ui),
-                }
-            });
+                    let content_width = ui.available_width().min(940.0);
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(content_width, ui.available_height()),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            self.ui_feedback(ui);
+
+                            match self.page {
+                                Page::Vpn => self.ui_vpn(ui),
+                                Page::Servers => self.ui_servers(ui),
+                                Page::Subscriptions => self.ui_subscriptions(ui),
+                                Page::Settings => self.ui_settings(ui),
+                            }
+                        },
+                    );
+                },
+            );
         });
 
         ui.ctx().request_repaint_after(Duration::from_millis(150));
