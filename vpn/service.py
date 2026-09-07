@@ -88,6 +88,7 @@ class Service:
             "skipped": s["skipped"],
             "source_type": s.get("source_type", "url"),
             "source_label": s.get("source") if s.get("source_type") == "file" else "URL",
+            "status": s.get("status", "active" if s.get("nodes") else "inactive"),
         } for s in self.store.data["subscriptions"]]
 
     @staticmethod
@@ -275,11 +276,12 @@ class Service:
                 "skipped": skipped,
                 "metadata": metadata,
                 "updated": int(time.time()),
+                "status": "active" if nodes else "inactive",
             }
 
             self.store.data["subscriptions"].append(record)
 
-            if self.store.data["selected"] is None:
+            if nodes and self.store.data["selected"] is None:
                 self.store.data["selected"] = nodes[0]["id"]
             elif (
                 old
@@ -292,7 +294,7 @@ class Service:
                     for n in nodes
                 )
             ):
-                self.store.data["selected"] = nodes[0]["id"]
+                self.store.data["selected"] = nodes[0]["id"] if nodes else None
 
             self.store.save()
             self.state["selected"] = self.store.data["selected"]
@@ -476,12 +478,13 @@ class Service:
                 "skipped": skipped,
                 "metadata": metadata,
                 "updated": int(time.time()),
+                "status": "active" if nodes else "inactive",
             }
             self.store.data["subscriptions"].append(record)
-            if self.store.data["selected"] is None:
+            if nodes and self.store.data["selected"] is None:
                 self.store.data["selected"] = nodes[0]["id"]
             elif old and any(n["id"] == self.store.data["selected"] for n in old["nodes"]) and not any(n["id"] == self.store.data["selected"] for n in nodes):
-                self.store.data["selected"] = nodes[0]["id"]
+                self.store.data["selected"] = nodes[0]["id"] if nodes else None
             self.store.save()
             self.state["selected"] = self.store.data["selected"]
         return {"id": identifier, "count": len(nodes), "skipped": skipped}

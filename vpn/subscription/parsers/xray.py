@@ -26,11 +26,14 @@ def _blocked(config):
     return False
 
 
-def items(data):
+def inactive(data):
     configs = data if isinstance(data, list) else [data]
-    if configs and all(_blocked(v) for v in configs if isinstance(v, dict)):
-        raise VPNError("Subscription is inactive")
-    return configs
+    configs = [v for v in configs if isinstance(v, dict)]
+    return bool(configs) and all(_blocked(v) for v in configs)
+
+
+def items(data):
+    return data if isinstance(data, list) else [data]
 
 
 def _tls_from_stream(stream):

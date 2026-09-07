@@ -21,6 +21,8 @@ def parse(text, subscription_id):
             if isinstance(data, dict) and "proxies" in data:
                 entries, converter = data["proxies"], clash.convert
             elif xray.is_xray(data):
+                if xray.inactive(data):
+                    return [], 0
                 entries, converter = xray.items(data), xray.convert
             else:
                 entries, converter = singbox.items(data), singbox.convert
