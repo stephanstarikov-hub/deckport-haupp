@@ -36,7 +36,7 @@ Starting with the 0.2.x architecture, the VPN process is owned by a persistent s
 
 Repository: **deckport-haupp**
 
-> DeckPort VPN 0.2.4 is the first stable Desktop release. Automated Linux coverage
+> DeckPort VPN 0.2.10 is the first stable Desktop release. Automated Linux coverage
 > does not replace the separate LCD and OLED Steam Deck acceptance checklist.
 
 ## Features
@@ -119,13 +119,13 @@ Closing Decky or the Desktop application does not intentionally terminate an act
 - internet access during installation
 - a supported VPN subscription
 
-### Install 0.2.4
+### Install 0.2.10
 
 Open Konsole in Desktop Mode:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.4/install.sh -o /tmp/deckport-install.sh
-bash /tmp/deckport-install.sh --version 0.2.4
+curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.10/install.sh -o /tmp/deckport-install.sh
+bash /tmp/deckport-install.sh --version 0.2.10
 ```
 
 The installer:
