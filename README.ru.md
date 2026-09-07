@@ -123,8 +123,8 @@ DeckPort VPN 0.2.x использует постоянный системный 
 Откройте Konsole в Desktop Mode:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.1/install.sh -o /tmp/deckport-install.sh
-bash /tmp/deckport-install.sh --version 0.2.1
+curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.2/install.sh -o /tmp/deckport-install.sh
+bash /tmp/deckport-install.sh --version 0.2.2
 ```
 
 Установщик:

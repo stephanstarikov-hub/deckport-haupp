@@ -207,5 +207,61 @@ class InstallerV2(unittest.TestCase):
         rollback.assert_called_once_with(record)
 
 
+    def test_prejournal_staging_failure_removes_inactive_release(self):
+        archive = self.root / "payload.zip"
+        archive.write_bytes(b"verified-payload")
+
+        account = {
+            "uid": 1000,
+            "gid": 1000,
+            "home": str(self.root / "home"),
+            "decky": False,
+        }
+
+        def fake_extract(
+            incoming,
+            destination,
+            expected,
+        ):
+            destination.mkdir(parents=True)
+            (destination / "marker").write_text(
+                "ok",
+                encoding="utf-8",
+            )
+            return {"version": "0.2.2"}
+
+        with patch(
+            "installer.transaction.extract",
+            side_effect=fake_extract,
+        ), patch.object(
+            self.tx,
+            "write_file",
+            side_effect=RuntimeError("forced staging failure"),
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "forced staging failure",
+            ):
+                self.tx.install(
+                    archive,
+                    "0" * 64,
+                    account,
+                    decky=False,
+                )
+
+        releases = self.base / "releases"
+
+        self.assertTrue(releases.is_dir())
+        self.assertEqual(
+            list(releases.iterdir()),
+            [],
+        )
+        self.assertIsNone(self.tx.current())
+        self.assertEqual(
+            self.tx.stage,
+            "release-staging",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

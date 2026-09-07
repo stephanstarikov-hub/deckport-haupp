@@ -1,5 +1,6 @@
 """pkexec entry: explicit user consent, local files only, sanitized output."""
 import argparse
+import errno
 import fcntl
 import json
 import os
@@ -12,6 +13,29 @@ sys.path.insert(0, str(ROOT))
 from installer.transaction import Transaction, BASE, checked_directory
 
 
+def safe_failure(exc):
+    if isinstance(exc, OSError):
+        if exc.errno == errno.ENOSPC:
+            return "Not enough free space for the update"
+        if exc.errno == errno.EROFS:
+            return "The installation filesystem is read-only"
+        if exc.errno in (errno.EACCES, errno.EPERM):
+            return "The installation filesystem denied access"
+
+        code = errno.errorcode.get(exc.errno)
+        return (
+            "System file operation failed"
+            + (f" ({code})" if code else "")
+        )
+
+    if isinstance(exc, ValueError):
+        message = str(exc).strip()
+        if message and len(message) <= 180:
+            return message
+
+    return type(exc).__name__
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=("install", "repair", "uninstall"))
@@ -20,6 +44,7 @@ def main():
     parser.add_argument("--decky", action="store_true")
     parser.add_argument("--purge", action="store_true")
     args = parser.parse_args()
+    transaction = None
     try:
         if os.geteuid() != 0 or "PKEXEC_UID" not in os.environ:
             raise ValueError("System authorization is required")
@@ -45,8 +70,27 @@ def main():
                     raise ValueError("Verified payload is required")
                 result = transaction.install(args.payload, args.sha256, account, decky=account["decky"])
             print(json.dumps({"ok": True, "components": result}), flush=True)
-    except Exception:
-        print(json.dumps({"ok": False, "error": "Installation could not finish. The previous version was retained; choose Repair to retry."}), flush=True)
+    except Exception as exc:
+        stage = (
+            transaction.stage
+            if transaction is not None
+            else "preflight"
+        )
+
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "stage": stage,
+                    "reason": safe_failure(exc),
+                    "error": (
+                        "Installation could not finish. "
+                        "The previous version was retained."
+                    ),
+                }
+            ),
+            flush=True,
+        )
         return 1
     return 0
 

@@ -143,6 +143,7 @@ class Transaction:
         self.system = system or System()
         self.progress = progress or (lambda *_: None)
         self.journal = self.base / "transaction.json"
+        self.stage = "preflight"
 
     def write_file(self, path, data, mode=0o644):
         if any(p.is_symlink() for p in (path, *path.parents)):
@@ -245,6 +246,7 @@ class Transaction:
             self.system.prepare()
         previous = self.current()
         record = {"previous": str(previous) if previous else None, "was_active": self.system.active(UNIT), "files": [], "plugin": None, "decky_active": self.system.active("plugin_loader.service")}
+        release = None
         try:
             with tempfile.TemporaryDirectory(prefix=".stage-", dir=self.base) as work:
                 work = Path(work)
@@ -252,15 +254,33 @@ class Transaction:
                 # root-owned snapshot. A caller cannot swap the checked payload.
                 incoming = work / "payload.zip"
                 incoming.write_bytes(read_regular(archive, 600 * 1024 * 1024))
+                self.stage = "bundle-validation"
                 self.progress(15, "Checking bundled files and permissions")
                 manifest = extract(incoming, work / "product", expected)
-                release = self.base / "releases" / (manifest["version"] + "-" + uuid.uuid4().hex[:12])
+
+                self.stage = "release-staging"
+                release = self.base / "releases" / (
+                    manifest["version"] + "-" + uuid.uuid4().hex[:12]
+                )
                 (work / "product").rename(release)
-                shutil.copyfile(incoming, release / "payload.zip")
+
+                # incoming and release are on the same filesystem. Move the
+                # verified snapshot instead of allocating another full archive
+                # copy during an upgrade.
+                incoming.replace(release / "payload.zip")
                 (release / "payload.zip").chmod(0o644)
-                (release / "payload.sha256").write_text(expected, encoding="ascii")
-                self.write_file(self.journal, json.dumps(record).encode(), 0o600)
+
+                checksum = release / "payload.sha256"
+                checksum.write_text(expected, encoding="ascii")
+                checksum.chmod(0o644)
+
+                self.write_file(
+                    self.journal,
+                    json.dumps(record).encode(),
+                    0o600,
+                )
                 self.base.chmod(0o755)
+                self.stage = "preserving-previous"
                 self.progress(40, "Saving the previous version")
                 # Migration copies data once. The old settings are kept intact.
                 settings = self.base / "settings"
@@ -276,12 +296,14 @@ class Transaction:
                     self.write_file(path, data, 0o600 if path.name == "installation.json" else 0o644)
                 if decky:
                     self.install_plugin(release, account, record)
+                self.stage = "activation"
                 self.progress(65, "Activating the new release")
                 self.system.ctl("stop", UNIT)
                 self.swap(release)
                 self.system.ctl("daemon-reload")
                 self.system.ctl("enable", "--now", UNIT)
                 self.system.health(manifest["version"])
+                self.stage = "desktop-integration"
                 self.progress(85, "Installing menu shortcut and icon")
                 self.integrate(account, record)
                 # The desktop integration is installed in /etc/xdg, never through
@@ -292,12 +314,25 @@ class Transaction:
                 self.journal.unlink(missing_ok=True)
                 self.system.resume()
                 self.base.chmod(0o755)
+                self.stage = "complete"
                 self.progress(100, "Installation complete")
                 return {"version": manifest["version"], "daemon": "installed", "sing-box": "verified", "desktop": "installed", "decky": "installed" if decky else "not selected", "rollback": "available" if previous else "first installation"}
         except BaseException:
             if self.journal.exists():
                 self.progress(10, "Restoring the previous version")
                 self.rollback(record)
+
+            # A failure before the transaction journal is committed can leave
+            # a fully validated but inactive release directory behind.
+            # It is never the active release in that case, so remove it.
+            try:
+                if release is not None and release.exists():
+                    current = self.current()
+                    if current != release:
+                        shutil.rmtree(release)
+            except Exception:
+                pass
+
             try:
                 if self.system.active(UNIT):
                     self.system.resume()
