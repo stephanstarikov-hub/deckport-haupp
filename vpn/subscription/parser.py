@@ -1,6 +1,6 @@
 from .detect import detect
 from .model import node
-from .parsers import uri_list, singbox, clash, wireguard
+from .parsers import uri_list, singbox, clash, wireguard, xray
 from ..errors import VPNError
 
 MAX_BYTES = 4 * 1024 * 1024
@@ -20,6 +20,8 @@ def parse(text, subscription_id):
         elif kind == "json":
             if isinstance(data, dict) and "proxies" in data:
                 entries, converter = data["proxies"], clash.convert
+            elif xray.is_xray(data):
+                entries, converter = xray.items(data), xray.convert
             else:
                 entries, converter = singbox.items(data), singbox.convert
         else:

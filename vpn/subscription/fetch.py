@@ -9,7 +9,7 @@ from ..errors import VPNError
 from .parser import MAX_BYTES
 
 
-HAPP_USER_AGENT = "Happ/1.0"
+HAPP_USER_AGENT = "Happ/5.5.0/linux"
 MAX_REDIRECTS = 8
 
 
@@ -43,7 +43,6 @@ class PinnedHTTPS(http.client.HTTPSConnection):
         self.address = address
 
     def connect(self):
-        # Connect to the validated IP, retaining TLS hostname verification/SNI.
         sock = socket.create_connection((self.address, self.port), self.timeout)
         try:
             self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
@@ -52,16 +51,37 @@ class PinnedHTTPS(http.client.HTTPSConnection):
             raise
 
 
+def _store_response_cookies(response, hostname, cookie_jar):
+    jar = cookie_jar.setdefault(hostname.lower(), {})
+    for header, value in response.getheaders():
+        if header.lower() != "set-cookie":
+            continue
+        first = value.split(";", 1)[0].strip()
+        name, sep, cookie_value = first.partition("=")
+        if not sep or not name or any(c in name for c in " \t\r\n;"):
+            continue
+        if any(ord(c) < 32 for c in cookie_value):
+            continue
+        jar[name] = cookie_value
+
+
+def _cookie_header(hostname, cookie_jar):
+    jar = cookie_jar.get(hostname.lower(), {})
+    return "; ".join(f"{name}={value}" for name, value in jar.items())
+
+
 def download(url):
     deadline = time.monotonic() + 25
-    seen = set()
+    seen = {}
+    cookie_jar = {}
 
     for _ in range(MAX_REDIRECTS + 1):
-        if url in seen:
-            raise VPNError("Subscription redirect loop detected")
-        seen.add(url)
-
         u = validate_url(url)
+        state = (url, _cookie_header(u.hostname, cookie_jar))
+        seen[state] = seen.get(state, 0) + 1
+        if seen[state] > 1:
+            raise VPNError("Subscription redirect loop detected")
+
         connection = None
         try:
             port = u.port or (443 if u.scheme == "https" else 80)
@@ -87,16 +107,22 @@ def download(url):
             else:
                 connection = PinnedHTTP(u.hostname, ips[0], port, min(10, remaining))
 
+            headers = {
+                "User-Agent": HAPP_USER_AGENT,
+                "Accept": "text/plain, application/json, application/yaml, application/x-yaml, application/octet-stream, */*;q=0.1",
+                "Accept-Encoding": "identity",
+            }
+            cookie = _cookie_header(u.hostname, cookie_jar)
+            if cookie:
+                headers["Cookie"] = cookie
+
             connection.request(
                 "GET",
                 (u.path or "/") + ("?" + u.query if u.query else ""),
-                headers={
-                    "User-Agent": HAPP_USER_AGENT,
-                    "Accept": "text/plain, application/json, application/yaml, application/x-yaml, application/octet-stream, */*;q=0.1",
-                    "Accept-Encoding": "identity",
-                },
+                headers=headers,
             )
             response = connection.getresponse()
+            _store_response_cookies(response, u.hostname, cookie_jar)
 
             if response.status in (301, 302, 303, 307, 308):
                 location = response.getheader("Location", "").strip()
