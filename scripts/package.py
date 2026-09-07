@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import json
 from pathlib import Path
 import zipfile
@@ -28,6 +28,7 @@ def collect_product_files():
             "package.json",
             "LICENSE",
             "README.md",
+            "README.ru.md",
             "THIRD_PARTY.md",
             "install.sh",
         )
@@ -185,6 +186,7 @@ def write_source(output, version):
             "rollup.config.js",
             "tsconfig.json",
             "README.md",
+            "README.ru.md",
             "LICENSE",
             "THIRD_PARTY.md",
             "install.sh",

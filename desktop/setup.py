@@ -1,4 +1,4 @@
-﻿import json
+import json
 from pathlib import Path
 import subprocess
 
@@ -137,6 +137,7 @@ class SetupWindow(QDialog):
         command = [
             "/usr/bin/pkexec",
             "/usr/bin/python3",
+            "-B",
             str(entry),
             action,
         ]

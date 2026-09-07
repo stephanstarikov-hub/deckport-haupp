@@ -1,9 +1,9 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -euo pipefail
 umask 077
 
-repo='stephanstarikov-hub/deckport-vpn'
-version='0.2.0'
+repo='stephanstarikov-hub/deckport-haupp'
+version='0.2.1'
 
 while (($#)); do
   case "$1" in
@@ -26,7 +26,7 @@ while (($#)); do
     --help|-h)
       printf '%s\n' \
         'DeckPort VPN installer' \
-        'Usage: bash install.sh [--repo OWNER/REPO] [--version 0.2.0]'
+        'Usage: bash install.sh [--repo OWNER/REPO] [--version 0.2.1]'
       exit 0
       ;;
     *)
@@ -202,6 +202,7 @@ printf '%s\n' \
 
 pkexec \
   /usr/bin/python3 \
+  -B \
   "$work/product/installer/entry.py" \
   install \
   --payload "$work/payload.zip" \

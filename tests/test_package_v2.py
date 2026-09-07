@@ -1,4 +1,5 @@
-﻿import os
+import os
+import json
 from pathlib import Path
 import stat
 import tempfile
@@ -9,6 +10,9 @@ from scripts import package as packaging
 
 
 ROOT = Path(__file__).resolve().parents[1]
+VERSION = json.loads(
+    (ROOT / "package.json").read_text(encoding="utf-8")
+)["version"]
 
 
 @unittest.skipUnless(
@@ -45,7 +49,7 @@ class PackageV2(unittest.TestCase):
 
             archive, digest = packaging.write_v2_payload(
                 output,
-                "0.2.0",
+                VERSION,
                 files,
             )
 
@@ -59,7 +63,7 @@ class PackageV2(unittest.TestCase):
 
             self.assertEqual(
                 manifest["version"],
-                "0.2.0",
+                VERSION,
             )
 
             self.assertTrue(

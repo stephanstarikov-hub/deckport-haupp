@@ -9,7 +9,7 @@ import urllib.request
 from urllib.parse import urlsplit
 from vpn.errors import VPNError
 
-REPO = "stephanstarikov-hub/deckport-vpn"
+REPO = "stephanstarikov-hub/deckport-haupp"
 SETUP = "DeckPort-VPN-Setup-x86_64.AppImage"
 
 

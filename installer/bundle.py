@@ -60,6 +60,19 @@ def extract(archive, destination, expected):
                 record = manifest["files"][entry.filename]
                 if record != {"sha256": digest_file(target), "mode": mode}:
                     raise ValueError("Payload file integrity check failed")
+        # Directory creation is affected by the installer's restrictive
+        # umask. Product directories contain immutable application files
+        # and must be traversable by the unprivileged Desktop application.
+        directories = [destination]
+        directories.extend(
+            path
+            for path in destination.rglob("*")
+            if path.is_dir()
+        )
+
+        for directory in directories:
+            directory.chmod(0o755)
+
         package = json.loads((destination / "package.json").read_text())
         if package["version"] != manifest["version"] or (destination / "backend/bin/sing-box").read_bytes()[:4] != b"\x7fELF":
             raise ValueError("Invalid Linux product payload")

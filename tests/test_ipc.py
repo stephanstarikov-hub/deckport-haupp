@@ -1,4 +1,4 @@
-﻿import unittest
+import unittest
 
 from vpn.errors import VPNError
 from vpn.ipc import (

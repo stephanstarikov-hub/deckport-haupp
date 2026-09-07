@@ -23,9 +23,27 @@ def checked_directory(path, mode=0o755, uid=0):
     path = Path(path)
     if not path.is_absolute() or any(p.is_symlink() for p in (path, *path.parents)):
         raise ValueError("Unsafe installation directory")
+
     path.mkdir(parents=True, exist_ok=True, mode=mode)
-    if os.name == "posix" and (path.stat().st_uid != uid or path.stat().st_mode & 0o022):
-        raise ValueError("Installation directory has unsafe ownership or permissions")
+
+    if os.name == "posix":
+        info = path.stat()
+
+        if info.st_uid != uid or info.st_mode & 0o022:
+            raise ValueError(
+                "Installation directory has unsafe ownership or permissions"
+            )
+
+        # mkdir() is affected by the caller's umask. Apply the intended
+        # final mode explicitly so the Desktop application can traverse
+        # immutable product directories.
+        path.chmod(mode)
+
+        if stat.S_IMODE(path.stat().st_mode) != mode:
+            raise ValueError(
+                "Installation directory permissions could not be applied"
+            )
+
     return path
 
 
@@ -64,8 +82,8 @@ StartLimitBurst=10
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 -I {base}/current/daemon-entry.py
-ExecStopPost=/usr/bin/python3 -I {base}/current/vpn/core/guardian.py {base}/current/backend/bin/sing-box /run/deckport-vpn/private/generated-config.json /run/deckport-vpn/private --cleanup
+ExecStart=/usr/bin/python3 -I -B {base}/current/daemon-entry.py
+ExecStopPost=/usr/bin/python3 -I -B {base}/current/vpn/core/guardian.py {base}/current/backend/bin/sing-box /run/deckport-vpn/private/generated-config.json /run/deckport-vpn/private --cleanup
 Restart=on-failure
 RestartSec=3
 TimeoutStopSec=45
