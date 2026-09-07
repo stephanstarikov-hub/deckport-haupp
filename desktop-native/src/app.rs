@@ -648,73 +648,97 @@ impl DeckPortApp {
     }
 
     fn ui_header(&mut self, ui: &mut egui::Ui) {
+        let green = egui::Color32::from_rgb(61, 240, 149);
+        let muted = egui::Color32::from_rgb(143, 163, 183);
+        let active = egui::Color32::from_rgb(16, 40, 58);
+
+        ui.set_width(205.0);
+        ui.set_min_height(ui.available_height());
+        ui.add_space(10.0);
+
         ui.horizontal(|ui| {
-            ui.heading("DeckPort VPN");
-            ui.separator();
-            ui.label(format!("v{VERSION}"));
+            ui.label(egui::RichText::new("◆").size(28.0).strong().color(green));
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("DeckPort").size(22.0).strong());
+                ui.label(
+                    egui::RichText::new("Your Privacy. Your Way.")
+                        .size(11.0)
+                        .color(muted),
+                );
+            });
         });
 
-        ui.add_space(8.0);
+        ui.add_space(34.0);
 
-        ui.horizontal(|ui| {
-            if ui.selectable_label(self.page == Page::Vpn, "VPN").clicked() {
-                self.page = Page::Vpn;
+        for (page, icon, label) in [
+            (Page::Vpn, "⌂", "Home"),
+            (Page::Servers, "◉", "Servers"),
+            (Page::Subscriptions, "↗", "Subscriptions"),
+            (Page::Settings, "⚙", "Settings"),
+        ] {
+            let selected = self.page == page;
+            let button = egui::Button::new(
+                egui::RichText::new(format!("{icon}   {label}"))
+                    .size(15.0)
+                    .color(if selected { egui::Color32::WHITE } else { muted }),
+            )
+            .fill(if selected { active } else { egui::Color32::TRANSPARENT })
+            .stroke(egui::Stroke::new(
+                1.0,
+                if selected {
+                    egui::Color32::from_rgb(27, 65, 84)
+                } else {
+                    egui::Color32::TRANSPARENT
+                },
+            ))
+            .min_size(egui::vec2(185.0, 44.0));
+
+            if ui.add(button).clicked() {
+                self.page = page;
             }
-
-            if ui
-                .selectable_label(self.page == Page::Servers, "Servers")
-                .clicked()
-            {
-                self.page = Page::Servers;
-            }
-
-            if ui
-                .selectable_label(self.page == Page::Subscriptions, "Subscriptions")
-                .clicked()
-            {
-                self.page = Page::Subscriptions;
-            }
-
-            if ui
-                .selectable_label(self.page == Page::Settings, "Settings")
-                .clicked()
-            {
-                self.page = Page::Settings;
-            }
-
-            ui.separator();
-
-            if ui
-                .add_enabled(
-                    !self.refresh_busy,
-                    egui::Button::new(if self.refresh_busy {
-                        "Refreshing..."
-                    } else {
-                        "Refresh"
-                    }),
-                )
-                .clicked()
-            {
-                self.request_refresh();
-            }
-        });
-
-        ui.separator();
-
-        if !self.error.is_empty() {
-            ui.colored_label(egui::Color32::LIGHT_RED, &self.error);
-            ui.add_space(4.0);
+            ui.add_space(3.0);
         }
 
+        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+            ui.add_space(10.0);
+            ui.label(
+                egui::RichText::new(format!("v{VERSION}"))
+                    .size(11.0)
+                    .color(egui::Color32::from_rgb(96, 118, 140)),
+            );
+            ui.label(
+                egui::RichText::new("●  Connected to core")
+                    .size(11.0)
+                    .color(green),
+            );
+        });
+    }
+
+    fn ui_feedback(&mut self, ui: &mut egui::Ui) {
+        if !self.error.is_empty() {
+            ui.colored_label(
+                egui::Color32::from_rgb(255, 126, 144),
+                &self.error,
+            );
+            ui.add_space(6.0);
+        }
         if !self.notice.is_empty() {
-            ui.label(&self.notice);
-            ui.add_space(4.0);
+            ui.colored_label(
+                egui::Color32::from_rgb(100, 240, 167),
+                &self.notice,
+            );
+            ui.add_space(6.0);
         }
     }
 
     fn ui_vpn(&mut self, ui: &mut egui::Ui) {
-        let state = self.state().to_string();
+        let green = egui::Color32::from_rgb(61, 240, 149);
+        let muted = egui::Color32::from_rgb(143, 163, 183);
+        let panel = egui::Color32::from_rgb(11, 27, 39);
+        let border = egui::Color32::from_rgb(23, 52, 72);
 
+        let state = self.state().to_string();
+        let connected = state == "CONNECTED";
         let selected = self
             .status
             .get("server")
@@ -723,88 +747,226 @@ impl DeckPortApp {
             .cloned()
             .unwrap_or(Value::Null);
 
-        ui.group(|ui| {
-            ui.vertical(|ui| {
-                ui.label("VPN STATUS");
+        let name = selected
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("Choose a server")
+            .to_string();
+        let protocol = selected
+            .get("protocol")
+            .and_then(Value::as_str)
+            .unwrap_or("—")
+            .to_uppercase();
+        let public_ip = self
+            .status
+            .get("public_ip")
+            .and_then(Value::as_str)
+            .unwrap_or("—")
+            .to_string();
 
-                ui.heading(state.replace('_', " "));
+        ui.heading(egui::RichText::new("VPN").size(26.0).strong());
+        ui.label(
+            egui::RichText::new("One tap to secure your Steam Deck connection.")
+                .color(muted),
+        );
+        ui.add_space(16.0);
 
-                if let Some(name) = selected.get("name").and_then(Value::as_str) {
-                    ui.add_space(8.0);
+        ui.columns(2, |columns| {
+            columns[0].vertical_centered(|ui| {
+                ui.label(
+                    egui::RichText::new(if connected {
+                        "🔒  Secure Connection"
+                    } else {
+                        "Connection ready"
+                    })
+                    .color(if connected { green } else { muted }),
+                );
+                ui.add_space(16.0);
 
-                    ui.strong(name);
+                let (rect, response) =
+                    ui.allocate_exact_size(egui::vec2(190.0, 190.0), egui::Sense::click());
+                let center = rect.center();
+                let ring = if connected {
+                    green
+                } else {
+                    egui::Color32::from_rgb(77, 101, 119)
+                };
 
-                    let protocol = selected
-                        .get("protocol")
-                        .and_then(Value::as_str)
-                        .unwrap_or("?")
-                        .to_uppercase();
+                ui.painter().circle_filled(
+                    center,
+                    84.0,
+                    egui::Color32::from_rgb(8, 27, 24),
+                );
+                ui.painter()
+                    .circle_stroke(center, 86.0, egui::Stroke::new(2.0, ring));
+                ui.painter().text(
+                    center,
+                    egui::Align2::CENTER_CENTER,
+                    "⏻",
+                    egui::FontId::proportional(56.0),
+                    ring,
+                );
 
-                    ui.label(protocol);
-                }
-
-                if let Some(ip) = self.status.get("public_ip").and_then(Value::as_str) {
-                    ui.add_space(8.0);
-                    ui.label(format!("Public IP: {ip}"));
-                }
-
-                if let Some(since) = self.status.get("since").and_then(Value::as_i64) {
-                    ui.label(format!("Connected for {}", elapsed_label(since)));
-                }
-
-                if let Some(verification) = self.status.get("verification").and_then(Value::as_str)
-                {
-                    let text = match verification {
-                        "verified" => "Public IP changed",
-                        "same_ip" => "Public IP did not change",
-                        "unavailable" => "IP verification unavailable",
-                        _ => "",
-                    };
-
-                    if !text.is_empty() {
-                        ui.label(text);
+                if response.clicked() && !self.action_busy {
+                    if connected
+                        || matches!(
+                            state.as_str(),
+                            "CONNECTING" | "RECONNECTING" | "DISCONNECTING" | "ERROR"
+                        )
+                    {
+                        self.request_mutation(
+                            "disconnect",
+                            vec![],
+                            "VPN disconnected",
+                            false,
+                        );
+                    } else if let Some(id) =
+                        self.selected_server_id().map(str::to_owned)
+                    {
+                        self.request_mutation(
+                            "connect",
+                            vec![json!(id)],
+                            "Connection started",
+                            false,
+                        );
+                    } else {
+                        self.page = Page::Servers;
                     }
                 }
+
+                ui.add_space(12.0);
+                ui.label(
+                    egui::RichText::new(if connected {
+                        "Connected"
+                    } else {
+                        "Disconnected"
+                    })
+                    .size(23.0)
+                    .strong()
+                    .color(if connected { green } else { muted }),
+                );
+
+                if let Some(since) =
+                    self.status.get("since").and_then(Value::as_i64)
+                {
+                    ui.label(
+                        egui::RichText::new(elapsed_label(since))
+                            .size(13.0)
+                            .color(muted),
+                    );
+                }
+
+                ui.add_space(12.0);
+                if ui
+                    .add(
+                        egui::Button::new(format!("◉  {name}     ›"))
+                            .fill(egui::Color32::from_rgb(14, 32, 45))
+                            .stroke(egui::Stroke::new(1.0, border))
+                            .min_size(egui::vec2(310.0, 50.0)),
+                    )
+                    .clicked()
+                {
+                    self.page = Page::Servers;
+                }
             });
-        });
 
-        ui.add_space(12.0);
+            let right = &mut columns[1];
+            egui::Frame::group(right.style())
+                .fill(panel)
+                .stroke(egui::Stroke::new(1.0, border))
+                .show(right, |ui| {
+                    ui.label(
+                        egui::RichText::new("Connection").size(17.0).strong(),
+                    );
+                    ui.add_space(8.0);
+                    for (key, value) in [
+                        ("State", state.replace('_', " ")),
+                        ("Protocol", protocol),
+                        ("Server", name.clone()),
+                        ("Public IP", public_ip),
+                    ] {
+                        ui.horizontal(|ui| {
+                            ui.label(egui::RichText::new(key).color(muted));
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(egui::RichText::new(value).strong());
+                                },
+                            );
+                        });
+                        ui.add_space(5.0);
+                    }
+                });
 
-        let selected_id = self.selected_server_id().map(str::to_owned);
+            right.add_space(12.0);
+            egui::Frame::group(right.style())
+                .fill(panel)
+                .stroke(egui::Stroke::new(1.0, border))
+                .show(right, |ui| {
+                    ui.label(
+                        egui::RichText::new("Quick Actions")
+                            .size(17.0)
+                            .strong(),
+                    );
+                    ui.add_space(8.0);
 
-        let can_connect =
-            selected_id.is_some() && matches!(state.as_str(), "DISCONNECTED" | "ERROR");
+                    if ui
+                        .add(
+                            egui::Button::new("◉  Change Server")
+                                .min_size(egui::vec2(ui.available_width(), 38.0)),
+                        )
+                        .clicked()
+                    {
+                        self.page = Page::Servers;
+                    }
 
-        let can_disconnect = matches!(
-            state.as_str(),
-            "CONNECTING" | "CONNECTED" | "RECONNECTING" | "DISCONNECTING" | "ERROR"
-        );
+                    if ui
+                        .add_enabled(
+                            !self.refresh_busy,
+                            egui::Button::new(if self.refresh_busy {
+                                "Refreshing…"
+                            } else {
+                                "↻  Refresh status"
+                            })
+                            .min_size(egui::vec2(ui.available_width(), 38.0)),
+                        )
+                        .clicked()
+                    {
+                        self.request_refresh();
+                    }
+                });
 
-        ui.horizontal(|ui| {
-            if ui
-                .add_enabled(
-                    can_connect && !self.action_busy,
-                    egui::Button::new("Connect VPN"),
-                )
-                .clicked()
-                && let Some(id) = selected_id.clone()
-            {
-                self.request_mutation("connect", vec![json!(id)], "Connection started", false);
-            }
-
-            if ui
-                .add_enabled(
-                    can_disconnect && !self.action_busy,
-                    egui::Button::new("Disconnect"),
-                )
-                .clicked()
-            {
-                self.request_mutation("disconnect", vec![], "VPN disconnected", false);
-            }
-
-            if ui.button("Choose server").clicked() {
-                self.page = Page::Servers;
-            }
+            right.add_space(12.0);
+            egui::Frame::group(right.style())
+                .fill(if connected {
+                    egui::Color32::from_rgb(9, 38, 29)
+                } else {
+                    panel
+                })
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    if connected { green } else { border },
+                ))
+                .show(right, |ui| {
+                    ui.label(
+                        egui::RichText::new(if connected {
+                            "◆  Your connection is secure"
+                        } else {
+                            "◇  VPN is disconnected"
+                        })
+                        .strong()
+                        .color(if connected { green } else { muted }),
+                    );
+                    ui.label(
+                        egui::RichText::new(if connected {
+                            "Traffic is protected through the active VPN tunnel."
+                        } else {
+                            "Choose a server and press the power button."
+                        })
+                        .size(12.0)
+                        .color(muted),
+                    );
+                });
         });
     }
 
@@ -1468,14 +1630,46 @@ impl eframe::App for DeckPortApp {
             self.request_refresh();
         }
 
-        self.ui_header(ui);
-
-        match self.page {
-            Page::Vpn => self.ui_vpn(ui),
-            Page::Servers => self.ui_servers(ui),
-            Page::Subscriptions => self.ui_subscriptions(ui),
-            Page::Settings => self.ui_settings(ui),
+        {
+            let visuals = ui.visuals_mut();
+            visuals.dark_mode = true;
+            visuals.panel_fill = egui::Color32::from_rgb(6, 16, 25);
+            visuals.window_fill = egui::Color32::from_rgb(7, 18, 27);
+            visuals.faint_bg_color = egui::Color32::from_rgb(10, 28, 40);
+            visuals.extreme_bg_color = egui::Color32::from_rgb(5, 13, 20);
+            visuals.selection.bg_fill = egui::Color32::from_rgb(22, 88, 61);
+            visuals.selection.stroke =
+                egui::Stroke::new(1.0, egui::Color32::from_rgb(61, 240, 149));
+            visuals.widgets.inactive.bg_fill =
+                egui::Color32::from_rgb(14, 34, 48);
+            visuals.widgets.hovered.bg_fill =
+                egui::Color32::from_rgb(17, 48, 64);
+            visuals.widgets.active.bg_fill =
+                egui::Color32::from_rgb(18, 71, 51);
         }
+
+        ui.horizontal(|ui| {
+            egui::Frame::group(ui.style())
+                .fill(egui::Color32::from_rgb(7, 20, 30))
+                .stroke(egui::Stroke::new(
+                    1.0,
+                    egui::Color32::from_rgb(18, 43, 59),
+                ))
+                .show(ui, |ui| self.ui_header(ui));
+
+            ui.add_space(12.0);
+
+            ui.vertical(|ui| {
+                self.ui_feedback(ui);
+
+                match self.page {
+                    Page::Vpn => self.ui_vpn(ui),
+                    Page::Servers => self.ui_servers(ui),
+                    Page::Subscriptions => self.ui_subscriptions(ui),
+                    Page::Settings => self.ui_settings(ui),
+                }
+            });
+        });
 
         ui.ctx().request_repaint_after(Duration::from_millis(150));
     }
