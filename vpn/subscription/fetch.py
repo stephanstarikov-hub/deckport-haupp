@@ -64,7 +64,7 @@ def download(url):
                 connection = PinnedHTTPS(u.hostname, ips[0], port, min(10, remaining))
             else:
                 connection = PinnedHTTP(u.hostname, ips[0], port, min(10, remaining))
-            connection.request("GET", (u.path or "/") + ("?" + u.query if u.query else ""), headers={"User-Agent": "DeckyVPN/0.1", "Accept": "text/plain, application/json, application/yaml", "Accept-Encoding": "identity"})
+            connection.request("GET", (u.path or "/") + ("?" + u.query if u.query else ""), headers={"User-Agent": "DeckPortVPN/0.2.5", "Accept": "text/plain, application/json, application/yaml, application/x-yaml, application/octet-stream, */*;q=0.1", "Accept-Encoding": "identity"})
             response = connection.getresponse()
             if response.status in (301, 302, 303, 307, 308):
                 url = urljoin(url, response.getheader("Location", ""))
