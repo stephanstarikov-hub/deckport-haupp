@@ -167,6 +167,7 @@ def write_source(output, version):
             "docs",
             "installer",
             "desktop",
+            "desktop-native",
             "assets",
         ):
             for path in (ROOT / name).rglob("*"):
@@ -263,6 +264,13 @@ def main():
                 f"Missing {name}: run fetch_deps.py "
                 "and pnpm build first"
             )
+
+    desktop_binary = ROOT / "desktop/deckport"
+
+    if desktop_binary.read_bytes()[:4] != b"\x7fELF":
+        raise SystemExit(
+            "Desktop client is not the native Linux ELF build"
+        )
 
     version = json.loads(
         (ROOT / "package.json").read_text(encoding="utf-8")

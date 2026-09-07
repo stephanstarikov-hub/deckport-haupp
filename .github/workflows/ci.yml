@@ -32,6 +32,16 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install native Desktop build dependencies
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev libxkbcommon-x11-dev libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+
+      - name: Build native Desktop client
+        run: |
+          cargo build --manifest-path desktop-native/Cargo.toml --release
+          cp desktop-native/target/release/deckport-vpn-desktop desktop/deckport
+
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 

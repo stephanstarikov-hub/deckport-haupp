@@ -74,6 +74,12 @@ def extract(archive, destination, expected):
             directory.chmod(0o755)
 
         package = json.loads((destination / "package.json").read_text())
-        if package["version"] != manifest["version"] or (destination / "backend/bin/sing-box").read_bytes()[:4] != b"\x7fELF":
+        if (
+            package["version"] != manifest["version"]
+            or (destination / "backend/bin/sing-box").read_bytes()[:4]
+            != b"\x7fELF"
+            or (destination / "desktop/deckport").read_bytes()[:4]
+            != b"\x7fELF"
+        ):
             raise ValueError("Invalid Linux product payload")
     return manifest
