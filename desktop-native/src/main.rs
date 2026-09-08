@@ -1,6 +1,7 @@
 mod app;
 mod ipc;
 mod setup;
+mod theme;
 
 use eframe::egui;
 use serde_json::{Value, json};
@@ -50,15 +51,16 @@ fn main() -> eframe::Result {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1180.0, 720.0])
-            .with_min_inner_size([920.0, 600.0]),
+            .with_inner_size([1280.0, 760.0])
+            .with_min_inner_size([800.0, 560.0]),
         ..Default::default()
     };
 
     eframe::run_native(
         "DeckPort VPN",
         options,
-        Box::new(move |_| {
+        Box::new(move |context| {
+            theme::apply(&context.egui_ctx);
             let application = if setup_mode {
                 app::DeckPortApp::new_setup()
             } else {

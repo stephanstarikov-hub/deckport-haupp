@@ -1,4 +1,5 @@
-use crate::{ipc, setup};
+use crate::theme::Icon;
+use crate::{ipc, setup, theme};
 use eframe::egui;
 use serde_json::{Value, json};
 use std::{
@@ -50,6 +51,7 @@ enum WorkerMessage {
 pub struct DeckPortApp {
     page: Page,
     status: Value,
+    daemon_online: bool,
     subscriptions: Vec<Value>,
     servers: Vec<Value>,
     selected_subscription: Option<String>,
@@ -97,6 +99,7 @@ impl DeckPortApp {
         let mut app = Self {
             page: Page::Vpn,
             status: json!({}),
+            daemon_online: false,
             subscriptions: Vec::new(),
             servers: Vec::new(),
             selected_subscription: None,
@@ -150,6 +153,7 @@ impl DeckPortApp {
         Self {
             page: Page::Vpn,
             status: json!({}),
+            daemon_online: false,
             subscriptions: Vec::new(),
             servers: Vec::new(),
             selected_subscription: None,
@@ -462,6 +466,7 @@ impl DeckPortApp {
 
                     match result {
                         Ok((status, subscriptions, preferences)) => {
+                            self.daemon_online = true;
                             let subscriptions_changed = self.subscriptions != subscriptions;
                             let preferred = status
                                 .get("selected_subscription")
@@ -508,6 +513,7 @@ impl DeckPortApp {
                         }
 
                         Err(message) => {
+                            self.daemon_online = false;
                             self.error = message;
                         }
                     }
@@ -648,318 +654,537 @@ impl DeckPortApp {
     }
 
     fn ui_header(&mut self, ui: &mut egui::Ui) {
-        ui.vertical(|ui| {
-            let green = egui::Color32::from_rgb(61, 240, 149);
-            let muted = egui::Color32::from_rgb(143, 163, 183);
-            let active = egui::Color32::from_rgb(16, 40, 58);
-
-            ui.set_width(205.0);
-            ui.set_min_height(ui.available_height());
-            ui.add_space(10.0);
-
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("DP").size(22.0).strong().color(green));
-                ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("DeckPort").size(22.0).strong());
-                    ui.label(
-                        egui::RichText::new("Your Privacy. Your Way.")
-                            .size(11.0)
-                            .color(muted),
-                    );
-                });
+        ui.set_min_height(ui.available_height());
+        ui.add_space(18.0);
+        ui.horizontal(|ui| {
+            let (rect, _) = ui.allocate_exact_size(egui::vec2(42.0, 52.0), egui::Sense::hover());
+            theme::paint_icon(
+                ui.painter(),
+                Icon::Shield,
+                rect.center(),
+                42.0,
+                theme::GREEN,
+            );
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("DeckPort").size(25.0).strong());
+                ui.label(
+                    egui::RichText::new("Your Privacy. Your Way.")
+                        .size(12.0)
+                        .color(theme::MUTED),
+                );
             });
-
-            ui.add_space(34.0);
-
-            for (page, icon, label) in [
-                (Page::Vpn, "H", "Home"),
-                (Page::Servers, "S", "Servers"),
-                (Page::Subscriptions, "L", "Subscriptions"),
-                (Page::Settings, "C", "Settings"),
-            ] {
-                let selected = self.page == page;
-                let button = egui::Button::new(
-                    egui::RichText::new(format!("{icon}   {label}"))
-                        .size(15.0)
-                        .color(if selected {
-                            egui::Color32::WHITE
-                        } else {
-                            muted
-                        }),
-                )
-                .fill(if selected {
-                    active
-                } else {
-                    egui::Color32::TRANSPARENT
-                })
-                .stroke(egui::Stroke::new(
-                    1.0,
-                    if selected {
-                        egui::Color32::from_rgb(27, 65, 84)
-                    } else {
-                        egui::Color32::TRANSPARENT
-                    },
-                ))
-                .min_size(egui::vec2(185.0, 44.0));
-
-                if ui.add(button).clicked() {
-                    self.page = page;
-                }
-                ui.add_space(3.0);
+        });
+        ui.add_space(34.0);
+        for (page, icon, label) in [
+            (Page::Vpn, Icon::Home, "Home"),
+            (Page::Servers, Icon::Servers, "Servers"),
+            (Page::Subscriptions, Icon::Link, "Subscriptions"),
+            (Page::Settings, Icon::Settings, "Settings"),
+        ] {
+            if theme::nav(ui, icon, label, self.page == page).clicked() {
+                self.page = page;
             }
-
-            ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
-                ui.add_space(10.0);
-                ui.label(
-                    egui::RichText::new(format!("v{VERSION}"))
-                        .size(11.0)
-                        .color(egui::Color32::from_rgb(96, 118, 140)),
-                );
-                ui.label(
-                    egui::RichText::new("Core connected")
-                        .size(11.0)
-                        .color(green),
-                );
-            });
+            ui.add_space(3.0);
+        }
+        ui.with_layout(egui::Layout::bottom_up(egui::Align::LEFT), |ui| {
+            ui.add_space(14.0);
+            ui.label(
+                egui::RichText::new(format!("v{VERSION}  ·  SteamOS"))
+                    .size(12.0)
+                    .color(theme::DIM),
+            );
+            theme::status_dot(
+                ui,
+                if self.daemon_online {
+                    "Connected to core"
+                } else if self.refresh_busy {
+                    "Connecting to core…"
+                } else {
+                    "Core unavailable"
+                },
+                if self.daemon_online {
+                    theme::GREEN
+                } else {
+                    theme::AMBER
+                },
+            );
         });
     }
 
     fn ui_feedback(&mut self, ui: &mut egui::Ui) {
         if !self.error.is_empty() {
-            ui.colored_label(egui::Color32::from_rgb(255, 126, 144), &self.error);
+            egui::Frame::new()
+                .fill(egui::Color32::from_rgb(43, 25, 32))
+                .corner_radius(10)
+                .inner_margin(12)
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.colored_label(theme::RED, &self.error);
+                });
             ui.add_space(6.0);
         }
         if !self.notice.is_empty() {
-            ui.colored_label(egui::Color32::from_rgb(100, 240, 167), &self.notice);
+            ui.horizontal_wrapped(|ui| {
+                ui.colored_label(theme::GREEN, &self.notice);
+                if ui.small_button("Dismiss").clicked() {
+                    self.notice.clear();
+                }
+            });
             ui.add_space(6.0);
         }
     }
 
-    fn ui_vpn(&mut self, ui: &mut egui::Ui) {
-        let green = egui::Color32::from_rgb(61, 240, 149);
-        let muted = egui::Color32::from_rgb(143, 163, 183);
-        let panel = egui::Color32::from_rgb(11, 27, 39);
-        let border = egui::Color32::from_rgb(23, 52, 72);
-
-        let state = self.state().to_string();
-        let connected = state == "CONNECTED";
+    fn connection_server(&self) -> Value {
+        let active = self.daemon_online
+            && matches!(
+                self.state(),
+                "CONNECTED" | "CONNECTING" | "RECONNECTING" | "DISCONNECTING"
+            );
         let selected = self
             .status
-            .get("server")
-            .filter(|value| !value.is_null())
-            .or_else(|| self.status.get("selected_server"))
-            .cloned()
-            .unwrap_or(Value::Null);
+            .get("selected_server")
+            .filter(|value| !value.is_null());
+        let server = self.status.get("server").filter(|value| !value.is_null());
+        if active {
+            server.or(selected)
+        } else {
+            selected
+        }
+        .cloned()
+        .unwrap_or(Value::Null)
+    }
 
-        let name = selected
+    fn ui_vpn(&mut self, ui: &mut egui::Ui) {
+        if ui.available_width() >= 780.0 {
+            let right_width = (ui.available_width() * 0.32).clamp(278.0, 330.0);
+            let main_width = ui.available_width() - right_width - 24.0;
+            ui.horizontal_top(|ui| {
+                ui.allocate_ui_with_layout(
+                    egui::vec2(main_width, 530.0),
+                    egui::Layout::top_down(egui::Align::Center),
+                    |ui| {
+                        self.ui_connection_stage(ui);
+                    },
+                );
+                ui.add_space(14.0);
+                ui.vertical(|ui| {
+                    ui.set_width(right_width);
+                    self.ui_connection_details(ui);
+                });
+            });
+        } else {
+            self.ui_connection_stage(ui);
+            ui.add_space(20.0);
+            self.ui_connection_details(ui);
+        }
+    }
+
+    fn ui_connection_stage(&mut self, ui: &mut egui::Ui) {
+        let state = self.state().to_string();
+        let connected = self.daemon_online && state == "CONNECTED";
+        let transitioning = self.daemon_online
+            && matches!(
+                state.as_str(),
+                "CONNECTING" | "RECONNECTING" | "DISCONNECTING"
+            );
+        let server = self.connection_server();
+        let name = server
             .get("name")
             .and_then(Value::as_str)
-            .unwrap_or("Choose a server")
-            .to_string();
-        let protocol = selected
+            .unwrap_or("Choose a server");
+        let protocol = server
             .get("protocol")
             .and_then(Value::as_str)
             .unwrap_or("—")
             .to_uppercase();
-        let public_ip = self
-            .status
-            .get("public_ip")
+        let country = server.get("country").and_then(Value::as_str).unwrap_or("");
+        let latency = server
+            .get("id")
             .and_then(Value::as_str)
-            .unwrap_or("—")
-            .to_string();
-
-        ui.heading(egui::RichText::new("VPN").size(26.0).strong());
-        ui.label(egui::RichText::new("One tap to secure your Steam Deck connection.").color(muted));
-        ui.add_space(16.0);
-
-        ui.columns(2, |columns| {
-            columns[0].vertical_centered(|ui| {
-                ui.label(
-                    egui::RichText::new(if connected {
-                        "Secure connection"
-                    } else {
-                        "Connection ready"
-                    })
-                    .color(if connected { green } else { muted }),
-                );
-                ui.add_space(16.0);
-
-                let (rect, response) =
-                    ui.allocate_exact_size(egui::vec2(190.0, 190.0), egui::Sense::click());
-                let center = rect.center();
-                let ring = if connected {
-                    green
-                } else {
-                    egui::Color32::from_rgb(77, 101, 119)
-                };
-
-                ui.painter()
-                    .circle_filled(center, 84.0, egui::Color32::from_rgb(8, 27, 24));
-                ui.painter()
-                    .circle_stroke(center, 86.0, egui::Stroke::new(2.0, ring));
-                ui.painter().circle_stroke(
-                    center + egui::vec2(0.0, 7.0),
-                    24.0,
-                    egui::Stroke::new(5.0, ring),
-                );
-                ui.painter().line_segment(
-                    [
-                        center + egui::vec2(0.0, -29.0),
-                        center + egui::vec2(0.0, 3.0),
-                    ],
-                    egui::Stroke::new(5.0, ring),
-                );
-
-                if response.clicked() && !self.action_busy {
-                    if connected
-                        || matches!(
-                            state.as_str(),
-                            "CONNECTING" | "RECONNECTING" | "DISCONNECTING" | "ERROR"
-                        )
-                    {
-                        self.request_mutation("disconnect", vec![], "VPN disconnected", false);
-                    } else if let Some(id) = self.selected_server_id().map(str::to_owned) {
-                        self.request_mutation(
-                            "connect",
-                            vec![json!(id)],
-                            "Connection started",
-                            false,
-                        );
-                    } else {
-                        self.page = Page::Servers;
-                    }
-                }
-
-                ui.add_space(12.0);
-                ui.label(
-                    egui::RichText::new(if connected {
-                        "Connected"
-                    } else {
-                        "Disconnected"
-                    })
-                    .size(23.0)
-                    .strong()
-                    .color(if connected { green } else { muted }),
-                );
-
-                if let Some(since) = self.status.get("since").and_then(Value::as_i64) {
-                    ui.label(
-                        egui::RichText::new(elapsed_label(since))
-                            .size(13.0)
-                            .color(muted),
-                    );
-                }
-
-                ui.add_space(12.0);
-                if ui
-                    .add(
-                        egui::Button::new(format!("Server: {name}"))
-                            .fill(egui::Color32::from_rgb(14, 32, 45))
-                            .stroke(egui::Stroke::new(1.0, border))
-                            .min_size(egui::vec2(310.0, 50.0)),
-                    )
-                    .clicked()
-                {
-                    self.page = Page::Servers;
-                }
-            });
-
-            let right = &mut columns[1];
-            egui::Frame::group(right.style())
-                .fill(panel)
-                .stroke(egui::Stroke::new(1.0, border))
-                .show(right, |ui| {
-                    ui.label(egui::RichText::new("Connection").size(17.0).strong());
-                    ui.add_space(8.0);
-                    for (key, value) in [
-                        ("State", state.replace('_', " ")),
-                        ("Protocol", protocol),
-                        ("Server", name.clone()),
-                        ("Public IP", public_ip),
-                    ] {
-                        ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new(key).color(muted));
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    ui.label(egui::RichText::new(value).strong());
-                                },
-                            );
-                        });
-                        ui.add_space(5.0);
-                    }
-                });
-
-            right.add_space(12.0);
-            egui::Frame::group(right.style())
-                .fill(panel)
-                .stroke(egui::Stroke::new(1.0, border))
-                .show(right, |ui| {
-                    ui.label(egui::RichText::new("Quick Actions").size(17.0).strong());
-                    ui.add_space(8.0);
-
-                    if ui
-                        .add(
-                            egui::Button::new("Change server")
-                                .min_size(egui::vec2(ui.available_width(), 38.0)),
-                        )
-                        .clicked()
-                    {
-                        self.page = Page::Servers;
-                    }
-
-                    if ui
-                        .add_enabled(
-                            !self.refresh_busy,
-                            egui::Button::new(if self.refresh_busy {
-                                "Refreshing..."
-                            } else {
-                                "Refresh status"
-                            })
-                            .min_size(egui::vec2(ui.available_width(), 38.0)),
-                        )
-                        .clicked()
-                    {
-                        self.request_refresh();
-                    }
-                });
-
-            right.add_space(12.0);
-            egui::Frame::group(right.style())
+            .map(|id| self.ping_label(id))
+            .unwrap_or_else(|| "—".into());
+        let accent = if connected {
+            theme::GREEN
+        } else if transitioning {
+            theme::AMBER
+        } else {
+            theme::MUTED
+        };
+        let map_rect = egui::Rect::from_min_size(
+            ui.cursor().min + egui::vec2(0.0, 72.0),
+            egui::vec2(ui.available_width(), 350.0),
+        );
+        theme::world_map(ui.painter(), map_rect);
+        ui.vertical_centered(|ui| {
+            ui.add_space(8.0);
+            egui::Frame::new()
                 .fill(if connected {
-                    egui::Color32::from_rgb(9, 38, 29)
+                    theme::GREEN_DARK
                 } else {
-                    panel
+                    theme::SURFACE
                 })
                 .stroke(egui::Stroke::new(
                     1.0,
-                    if connected { green } else { border },
+                    if connected {
+                        egui::Color32::from_rgb(37, 91, 68)
+                    } else {
+                        theme::BORDER
+                    },
                 ))
-                .show(right, |ui| {
-                    ui.label(
-                        egui::RichText::new(if connected {
-                            "Your connection is secure"
-                        } else {
-                            "VPN is disconnected"
-                        })
-                        .strong()
-                        .color(if connected { green } else { muted }),
-                    );
-                    ui.label(
-                        egui::RichText::new(if connected {
-                            "Traffic is protected through the active VPN tunnel."
-                        } else {
-                            "Choose a server and press the power button."
-                        })
-                        .size(12.0)
-                        .color(muted),
-                    );
+                .corner_radius(24)
+                .inner_margin(egui::Margin::symmetric(16, 8))
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        let (rect, _) =
+                            ui.allocate_exact_size(egui::vec2(17.0, 20.0), egui::Sense::hover());
+                        theme::paint_icon(
+                            ui.painter(),
+                            if connected { Icon::Lock } else { Icon::Shield },
+                            rect.center(),
+                            16.0,
+                            accent,
+                        );
+                        ui.label(
+                            egui::RichText::new(if connected {
+                                "Secure Connection"
+                            } else if transitioning {
+                                "Connection in progress"
+                            } else {
+                                "Your private connection"
+                            })
+                            .size(14.0)
+                            .color(accent),
+                        );
+                    });
                 });
+            ui.add_space(52.0);
+            let action_label = power_action_label(
+                &state,
+                self.daemon_online,
+                self.selected_server_id().is_some(),
+            );
+            let response = ui.add_enabled(
+                self.daemon_online && !self.action_busy,
+                egui::Button::new("")
+                    .fill(egui::Color32::TRANSPARENT)
+                    .stroke(egui::Stroke::NONE)
+                    .min_size(egui::vec2(218.0, 218.0))
+                    .corner_radius(109),
+            );
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(
+                    egui::WidgetType::Button,
+                    self.daemon_online && !self.action_busy,
+                    action_label,
+                )
+            });
+            let center = response.rect.center();
+            let painter = ui.painter();
+            theme::glow(painter, center, 92.0, connected);
+            painter.circle_filled(center, 104.0, theme::BACKGROUND);
+            painter.circle_stroke(
+                center,
+                104.0,
+                egui::Stroke::new(
+                    1.0,
+                    if connected {
+                        egui::Color32::from_rgb(32, 98, 69)
+                    } else {
+                        theme::BORDER
+                    },
+                ),
+            );
+            painter.circle_filled(
+                center,
+                94.0,
+                if connected {
+                    egui::Color32::from_rgb(9, 36, 28)
+                } else {
+                    theme::SURFACE
+                },
+            );
+            painter.circle_stroke(
+                center,
+                94.0,
+                egui::Stroke::new(
+                    if response.hovered() || response.has_focus() {
+                        4.0
+                    } else {
+                        2.5
+                    },
+                    accent,
+                ),
+            );
+            if connected {
+                painter.circle_stroke(
+                    center,
+                    90.0,
+                    egui::Stroke::new(1.0, egui::Color32::from_rgb(41, 91, 62)),
+                );
+            }
+            theme::paint_icon(painter, Icon::Power, center, 60.0, accent);
+            if transitioning || self.action_busy {
+                ui.ctx().request_repaint_after(Duration::from_millis(80));
+                ui.spinner();
+            }
+            let clicked = response.on_hover_text(action_label).clicked();
+            if clicked {
+                if matches!(
+                    state.as_str(),
+                    "CONNECTED" | "CONNECTING" | "RECONNECTING" | "DISCONNECTING" | "ERROR"
+                ) {
+                    self.request_mutation("disconnect", vec![], "VPN disconnected", false);
+                } else if let Some(id) = self.selected_server_id().map(str::to_owned) {
+                    self.request_mutation("connect", vec![json!(id)], "Connection started", false);
+                } else {
+                    self.page = Page::Servers;
+                }
+            }
+            ui.add_space(8.0);
+            ui.label(
+                egui::RichText::new(connection_title(&state, self.daemon_online))
+                    .size(25.0)
+                    .strong()
+                    .color(accent),
+            );
+            ui.label(
+                egui::RichText::new(if connected {
+                    connection_uptime(self.status.get("since").and_then(Value::as_i64))
+                } else {
+                    action_label.to_string()
+                })
+                .size(14.0)
+                .color(theme::MUTED),
+            );
+            ui.add_space(12.0);
+
+            let width = ui.available_width().min(350.0);
+            let response = ui.add_sized(
+                [width, 65.0],
+                egui::Button::new("").fill(theme::SURFACE).corner_radius(16),
+            );
+            response.widget_info(|| {
+                egui::WidgetInfo::labeled(
+                    egui::WidgetType::Button,
+                    true,
+                    format!("Change server: {name}"),
+                )
+            });
+            let rect = response.rect;
+            theme::country_badge(
+                ui.painter(),
+                egui::pos2(rect.left() + 32.0, rect.center().y),
+                country,
+            );
+            theme::text(
+                ui.painter(),
+                egui::pos2(rect.left() + 61.0, rect.center().y - 10.0),
+                name,
+                16.0,
+                theme::TEXT,
+                rect.right() - 36.0,
+            );
+            theme::text(
+                ui.painter(),
+                egui::pos2(rect.left() + 61.0, rect.center().y + 13.0),
+                &format!("{protocol}  ·  {latency}"),
+                13.0,
+                theme::MUTED,
+                rect.right() - 36.0,
+            );
+            theme::paint_icon(
+                ui.painter(),
+                Icon::Chevron,
+                egui::pos2(rect.right() - 21.0, rect.center().y),
+                18.0,
+                theme::MUTED,
+            );
+            if response.on_hover_text(name).clicked() {
+                self.page = Page::Servers;
+            }
+
+            ui.add_space(18.0);
+            theme::card().show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.columns(3, |columns| {
+                    for (column, (icon, value, label)) in columns.iter_mut().zip([
+                        (
+                            Icon::Clock,
+                            if connected {
+                                connection_uptime(self.status.get("since").and_then(Value::as_i64))
+                            } else {
+                                "—".into()
+                            },
+                            "Uptime",
+                        ),
+                        (Icon::Shield, protocol, "Protocol"),
+                        (Icon::Activity, latency, "TCP latency"),
+                    ]) {
+                        column.vertical_centered(|ui| {
+                            let (rect, _) = ui
+                                .allocate_exact_size(egui::vec2(24.0, 24.0), egui::Sense::hover());
+                            theme::paint_icon(
+                                ui.painter(),
+                                icon,
+                                rect.center(),
+                                21.0,
+                                theme::GREEN,
+                            );
+                            ui.label(egui::RichText::new(value).size(16.0));
+                            ui.label(egui::RichText::new(label).size(13.0).color(theme::MUTED));
+                        });
+                    }
+                });
+            });
         });
     }
 
+    fn ui_connection_details(&mut self, ui: &mut egui::Ui) {
+        let connected = self.daemon_online && self.state() == "CONNECTED";
+        let server = self.connection_server();
+        let protocol = server
+            .get("protocol")
+            .and_then(Value::as_str)
+            .unwrap_or("—")
+            .to_uppercase();
+        let name = server
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or("Not selected");
+        let latency = server
+            .get("id")
+            .and_then(Value::as_str)
+            .map(|id| self.ping_label(id))
+            .unwrap_or_else(|| "—".into());
+        theme::card().show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            theme::section(ui, "Connection");
+            theme::key_value(ui, "Protocol", &protocol);
+            theme::key_value(ui, "Server", name);
+            theme::key_value(ui, "Ping", &latency);
+            theme::key_value(
+                ui,
+                "Uptime",
+                &if connected {
+                    connection_uptime(self.status.get("since").and_then(Value::as_i64))
+                } else {
+                    "—".into()
+                },
+            );
+            theme::key_value(
+                ui,
+                "Public IP",
+                if connected {
+                    self.status
+                        .get("public_ip")
+                        .and_then(Value::as_str)
+                        .unwrap_or("Not verified")
+                } else {
+                    "—"
+                },
+            );
+        });
+        ui.add_space(8.0);
+        theme::card().show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            theme::section(ui, "Quick Actions");
+            if theme::action(ui, Icon::Servers, "Change Server").clicked() {
+                self.page = Page::Servers;
+            }
+            if ui
+                .add_enabled_ui(!self.refresh_busy, |ui| {
+                    theme::action(
+                        ui,
+                        Icon::Refresh,
+                        if self.refresh_busy {
+                            "Refreshing…"
+                        } else {
+                            "Refresh Status"
+                        },
+                    )
+                })
+                .inner
+                .clicked()
+            {
+                self.request_refresh();
+            }
+            if theme::action(ui, Icon::Settings, "Connection Settings").clicked() {
+                self.page = Page::Settings;
+            }
+        });
+        ui.add_space(8.0);
+        theme::card()
+            .fill(if connected {
+                egui::Color32::from_rgb(11, 31, 30)
+            } else {
+                theme::SURFACE
+            })
+            .show(ui, |ui| {
+                ui.set_width(ui.available_width());
+                ui.horizontal_top(|ui| {
+                    let (rect, _) =
+                        ui.allocate_exact_size(egui::vec2(37.0, 46.0), egui::Sense::hover());
+                    theme::paint_icon(
+                        ui.painter(),
+                        Icon::Shield,
+                        rect.center(),
+                        34.0,
+                        if connected {
+                            theme::GREEN
+                        } else {
+                            theme::MUTED
+                        },
+                    );
+                    ui.vertical(|ui| {
+                        ui.label(
+                            egui::RichText::new(if connected {
+                                "Your VPN tunnel is active"
+                            } else {
+                                "Your VPN is not connected"
+                            })
+                            .size(14.0)
+                            .strong()
+                            .color(if connected {
+                                theme::GREEN
+                            } else {
+                                theme::TEXT
+                            }),
+                        );
+                        ui.label(
+                            egui::RichText::new(if connected {
+                                "Traffic is routed through your selected VPN server."
+                            } else if self.daemon_online {
+                                "Choose a server, then press the power button."
+                            } else {
+                                "Start the DeckPort service to connect."
+                            })
+                            .size(13.0)
+                            .color(theme::MUTED),
+                        );
+                    });
+                });
+                if connected {
+                    let verification = self
+                        .status
+                        .get("verification")
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(match verification {
+                            "verified" => "Public IP change verified.",
+                            "same_ip" => "Public IP has not changed. Check your provider.",
+                            _ => "Public IP verification is informational.",
+                        })
+                        .size(12.0)
+                        .color(theme::MUTED),
+                    );
+                }
+            });
+    }
+
     fn ui_servers(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Servers");
+        theme::heading(ui, "Servers", "Find your next connection.");
 
         let options: Vec<(String, String)> = self
             .subscriptions
@@ -976,7 +1201,15 @@ impl DeckPortApp {
             .collect();
 
         if options.is_empty() {
-            ui.label("No subscriptions. Add one on the Subscriptions page.");
+            theme::card().show(ui, |ui| {
+                theme::section(ui, "Your servers will appear here");
+                ui.label(
+                    egui::RichText::new(
+                        "Add a subscription URL or import a local file to get started.",
+                    )
+                    .color(theme::MUTED),
+                );
+            });
 
             if ui.button("Add subscription").clicked() {
                 self.page = Page::Subscriptions;
@@ -994,7 +1227,7 @@ impl DeckPortApp {
 
         let mut change_subscription = None;
 
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             egui::ComboBox::from_id_salt("desktop_subscription_selector")
                 .selected_text(current_name)
                 .show_ui(ui, |ui| {
@@ -1032,22 +1265,27 @@ impl DeckPortApp {
 
         ui.add_space(8.0);
 
-        ui.horizontal(|ui| {
-            ui.add(egui::TextEdit::singleline(&mut self.search).hint_text("Search servers"));
-
-            ui.label("Sort:");
-
-            ui.selectable_value(&mut self.sort_mode, SortMode::Default, "Default");
-
-            ui.selectable_value(&mut self.sort_mode, SortMode::Latency, "Ping");
-
-            ui.selectable_value(&mut self.sort_mode, SortMode::Name, "Name");
-
-            ui.separator();
-            ui.checkbox(&mut self.favorites_only, "Favorites only");
+        ui.horizontal_wrapped(|ui| {
+            let search_width = (ui.available_width() - 285.0).clamp(170.0, 430.0);
+            ui.add(
+                egui::TextEdit::singleline(&mut self.search)
+                    .desired_width(search_width)
+                    .hint_text("Search servers…"),
+            );
+            egui::ComboBox::from_id_salt("server_sort")
+                .selected_text(match self.sort_mode {
+                    SortMode::Default => "Default order",
+                    SortMode::Latency => "Lowest ping",
+                    SortMode::Name => "Name A–Z",
+                })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.sort_mode, SortMode::Default, "Default order");
+                    ui.selectable_value(&mut self.sort_mode, SortMode::Latency, "Lowest ping");
+                    ui.selectable_value(&mut self.sort_mode, SortMode::Name, "Name A–Z");
+                });
+            ui.checkbox(&mut self.favorites_only, "Favorites");
         });
-
-        ui.separator();
+        ui.add_space(12.0);
 
         let query = self.search.to_lowercase();
 
@@ -1109,63 +1347,144 @@ impl DeckPortApp {
         let mut select_server = None;
         let mut favorite_change = None;
 
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            for server in servers {
-                let Some(id) = server.get("id").and_then(Value::as_str).map(str::to_owned) else {
-                    continue;
-                };
-
-                let name = server
-                    .get("name")
-                    .and_then(Value::as_str)
-                    .unwrap_or("Unnamed server");
-
-                let protocol = server
-                    .get("protocol")
-                    .and_then(Value::as_str)
-                    .unwrap_or("?")
-                    .to_uppercase();
-
-                let country = server.get("country").and_then(Value::as_str).unwrap_or("");
-
-                let favorite = server
-                    .get("favorite")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false);
-
-                let selected = self.selected_server_id() == Some(id.as_str());
-
-                let ping = self.ping_label(&id);
-
+        ui.label(
+            egui::RichText::new(format!("{} servers", servers.len()))
+                .size(13.0)
+                .color(theme::MUTED),
+        );
+        if servers.is_empty() {
+            theme::card().show(ui, |ui| {
+                theme::section(
+                    ui,
+                    if self.loading_subscription.is_some() {
+                        "Loading servers…"
+                    } else {
+                        "No matching servers"
+                    },
+                );
+                ui.label(
+                    egui::RichText::new(
+                        "Try a different search, turn off Favorites, or refresh the subscription.",
+                    )
+                    .color(theme::MUTED),
+                );
+            });
+        }
+        for server in servers {
+            let Some(id) = server.get("id").and_then(Value::as_str).map(str::to_owned) else {
+                continue;
+            };
+            let name = server
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("Unnamed server");
+            let protocol = server
+                .get("protocol")
+                .and_then(Value::as_str)
+                .unwrap_or("?")
+                .to_uppercase();
+            let country = server.get("country").and_then(Value::as_str).unwrap_or("");
+            let favorite = server
+                .get("favorite")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let selected = self.selected_server_id() == Some(id.as_str());
+            let ping = self.ping_label(&id);
+            let ping_color = match self.latency(&id) {
+                u64::MAX => theme::DIM,
+                0..=79 => theme::GREEN,
+                80..=149 => theme::AMBER,
+                _ => theme::RED,
+            };
+            ui.push_id(&id, |ui| {
                 ui.horizontal(|ui| {
-                    if ui
-                        .add_enabled(
+                    let width = (ui.available_width() - 48.0).max(180.0);
+                    let response = ui.add_enabled(
+                        !self.action_busy,
+                        egui::Button::new("")
+                            .min_size(egui::vec2(width, 68.0))
+                            .corner_radius(12)
+                            .fill(if selected {
+                                theme::GREEN_DARK
+                            } else {
+                                theme::SURFACE
+                            })
+                            .stroke(egui::Stroke::new(
+                                1.0,
+                                if selected {
+                                    egui::Color32::from_rgb(44, 98, 74)
+                                } else {
+                                    theme::BORDER
+                                },
+                            )),
+                    );
+                    response.widget_info(|| {
+                        egui::WidgetInfo::selected(
+                            egui::WidgetType::SelectableLabel,
                             !self.action_busy,
-                            egui::Button::new(if favorite { "\u{2605}" } else { "\u{2606}" }),
+                            selected,
+                            format!("{name}, {protocol}, {ping}"),
                         )
+                    });
+                    let rect = response.rect;
+                    theme::country_badge(
+                        ui.painter(),
+                        egui::pos2(rect.left() + 30.0, rect.center().y),
+                        country,
+                    );
+                    theme::text(
+                        ui.painter(),
+                        egui::pos2(rect.left() + 60.0, rect.center().y - 10.0),
+                        name,
+                        16.0,
+                        theme::TEXT,
+                        rect.right() - 100.0,
+                    );
+                    theme::text(
+                        ui.painter(),
+                        egui::pos2(rect.left() + 60.0, rect.center().y + 13.0),
+                        &format!("{protocol}{}", if selected { "  ·  Selected" } else { "" }),
+                        13.0,
+                        theme::MUTED,
+                        rect.right() - 100.0,
+                    );
+                    ui.painter().circle_filled(
+                        egui::pos2(rect.right() - 90.0, rect.center().y),
+                        3.0,
+                        ping_color,
+                    );
+                    theme::text(
+                        ui.painter(),
+                        egui::pos2(rect.right() - 80.0, rect.center().y),
+                        &ping,
+                        13.0,
+                        ping_color,
+                        rect.right() - 7.0,
+                    );
+                    if response.on_hover_text(name).clicked() {
+                        select_server = Some(id.clone());
+                    }
+                    if ui
+                        .add_enabled_ui(!self.action_busy, |ui| {
+                            theme::icon_button(
+                                ui,
+                                Icon::Star,
+                                if favorite {
+                                    "Remove from favorites"
+                                } else {
+                                    "Add to favorites"
+                                },
+                                favorite,
+                            )
+                        })
+                        .inner
                         .clicked()
                     {
                         favorite_change = Some((id.clone(), !favorite));
                     }
-
-                    if ui.selectable_label(selected, name).clicked() {
-                        select_server = Some(id.clone());
-                    }
-
-                    ui.label(protocol);
-
-                    if !country.is_empty() {
-                        ui.label(country);
-                    }
-
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.label(ping);
-                    });
                 });
-
-                ui.separator();
-            }
-        });
+            });
+        }
 
         if let Some((id, enabled)) = favorite_change {
             self.request_mutation(
@@ -1186,13 +1505,11 @@ impl DeckPortApp {
     }
 
     fn ui_subscriptions(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Subscriptions");
-        ui.label("Decky and Desktop use this same list through deckportd.");
-        ui.add_space(8.0);
+        theme::heading(ui, "Subscriptions", "Manage your VPN subscriptions.");
 
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             if ui
-                .add_enabled(!self.action_busy, egui::Button::new("Add subscription"))
+                .add_enabled(!self.action_busy, theme::primary("+  Add Subscription"))
                 .clicked()
             {
                 self.add_mode = !self.add_mode;
@@ -1326,23 +1643,116 @@ impl DeckPortApp {
 
         let mut choose = None;
 
-        egui::ScrollArea::vertical()
-            .max_height(190.0)
-            .show(ui, |ui| {
-                for (id, name, count, source) in &subscriptions {
-                    let selected = self.selected_subscription.as_deref() == Some(id.as_str());
-
-                    if ui
-                        .selectable_label(
+        for (id, name, count, source) in &subscriptions {
+            let selected = self.selected_subscription.as_deref() == Some(id.as_str());
+            let updated = self
+                .subscriptions
+                .iter()
+                .find(|item| item.get("id").and_then(Value::as_str) == Some(id.as_str()))
+                .and_then(|item| item.get("updated"))
+                .and_then(Value::as_i64)
+                .unwrap_or(0);
+            let updated_label = if updated > 0 {
+                format!("Updated {} ago", elapsed_label(updated))
+            } else {
+                "Not refreshed yet".to_string()
+            };
+            ui.push_id(id, |ui| {
+                ui.horizontal(|ui| {
+                    let width = (ui.available_width() - 48.0).max(200.0);
+                    let response = ui.add_sized(
+                        [width, 92.0],
+                        egui::Button::new("")
+                            .fill(if selected {
+                                theme::RAISED
+                            } else {
+                                theme::SURFACE
+                            })
+                            .stroke(egui::Stroke::new(
+                                1.0,
+                                if selected {
+                                    egui::Color32::from_rgb(45, 85, 71)
+                                } else {
+                                    theme::BORDER
+                                },
+                            ))
+                            .corner_radius(14),
+                    );
+                    response.widget_info(|| {
+                        egui::WidgetInfo::selected(
+                            egui::WidgetType::SelectableLabel,
+                            true,
                             selected,
-                            format!("{name}  -  {count} servers  -  {source}"),
+                            format!("{name}, {count} servers"),
                         )
-                        .clicked()
-                    {
+                    });
+                    let rect = response.rect;
+                    theme::paint_icon(
+                        ui.painter(),
+                        Icon::Link,
+                        egui::pos2(rect.left() + 30.0, rect.center().y),
+                        25.0,
+                        if selected { theme::GREEN } else { theme::MUTED },
+                    );
+                    let left = rect.left() + 59.0;
+                    let right = rect.right() - 101.0;
+                    theme::text(
+                        ui.painter(),
+                        egui::pos2(left, rect.center().y - 23.0),
+                        name,
+                        16.0,
+                        theme::TEXT,
+                        right,
+                    );
+                    theme::text(
+                        ui.painter(),
+                        egui::pos2(left, rect.center().y),
+                        if source == "url" {
+                            "Private subscription URL"
+                        } else {
+                            "Local subscription"
+                        },
+                        13.0,
+                        theme::MUTED,
+                        right,
+                    );
+                    theme::text(
+                        ui.painter(),
+                        egui::pos2(left, rect.center().y + 23.0),
+                        &updated_label,
+                        12.0,
+                        theme::DIM,
+                        right,
+                    );
+                    theme::text(
+                        ui.painter(),
+                        egui::pos2(rect.right() - 93.0, rect.center().y),
+                        &format!("{count} servers"),
+                        13.0,
+                        theme::MUTED,
+                        rect.right() - 7.0,
+                    );
+                    if response.on_hover_text(name).clicked() {
                         choose = Some(id.clone());
                     }
-                }
+                    if ui
+                        .add_enabled_ui(!self.action_busy, |ui| {
+                            theme::icon_button(ui, Icon::Refresh, "Refresh subscription", false)
+                        })
+                        .inner
+                        .clicked()
+                    {
+                        self.request_mutation(
+                            "refresh",
+                            vec![json!(id.clone())],
+                            "Subscription refreshed",
+                            true,
+                        );
+                    }
+                });
             });
+        }
+        ui.add_space(10.0);
 
         if let Some(id) = choose {
             self.choose_subscription(id);
@@ -1479,37 +1889,87 @@ impl DeckPortApp {
     }
 
     fn ui_settings(&mut self, ui: &mut egui::Ui) {
-        ui.heading("Settings");
-
-        let channel = self
-            .preferences
-            .get("channel")
-            .and_then(Value::as_str)
-            .unwrap_or("stable")
-            .to_string();
-        let autostart = self
-            .preferences
-            .get("autostart")
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-
-        ui.group(|ui| {
-            ui.strong("Updates");
-            ui.label("Stable receives normal releases. Preview receives prereleases too.");
-
-            ui.horizontal(|ui| {
-                for value in ["stable", "preview"] {
+        theme::heading(ui, "Settings", "Make DeckPort feel at home.");
+        theme::section(ui, "General");
+        theme::card().show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            let mut enabled = self
+                .preferences
+                .get("autostart")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            if theme::setting(
+                ui,
+                Icon::Power,
+                "Start with Desktop Mode",
+                "Launch DeckPort when your desktop starts.",
+                &mut enabled,
+                self.daemon_online && !self.action_busy,
+            ) {
+                match update_autostart_file(enabled) {
+                    Ok(()) => self.request_mutation(
+                        "set_preferences",
+                        vec![json!({"autostart": enabled})],
+                        "Desktop startup preference changed",
+                        false,
+                    ),
+                    Err(message) => self.error = message,
+                }
+            }
+            ui.separator();
+            let mut unavailable = false;
+            theme::setting(
+                ui,
+                Icon::Refresh,
+                "Auto Connect",
+                "Not supported by the current VPN core.",
+                &mut unavailable,
+                false,
+            );
+        });
+        ui.add_space(10.0);
+        theme::section(ui, "Connection");
+        theme::card().show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            let mut unavailable = false;
+            theme::setting(
+                ui,
+                Icon::Shield,
+                "Kill Switch",
+                "Not supported. Traffic is not blocked when VPN is off.",
+                &mut unavailable,
+                false,
+            );
+            ui.separator();
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Server latency");
+                ui.label(
+                    egui::RichText::new("Check real TCP latency on the Servers page.")
+                        .size(14.0)
+                        .color(theme::MUTED),
+                );
+                if ui.button("Open Servers").clicked() {
+                    self.page = Page::Servers;
+                }
+            });
+        });
+        ui.add_space(10.0);
+        theme::section(ui, "Updates");
+        theme::card().show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            let channel = self
+                .preferences
+                .get("channel")
+                .and_then(Value::as_str)
+                .unwrap_or("stable")
+                .to_string();
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Release channel");
+                for (value, label) in [("stable", "Stable"), ("preview", "Preview")] {
                     if ui
                         .add_enabled(
-                            !self.action_busy,
-                            egui::RadioButton::new(
-                                channel == value,
-                                if value == "stable" {
-                                    "Stable"
-                                } else {
-                                    "Preview"
-                                },
-                            ),
+                            self.daemon_online && !self.action_busy,
+                            egui::RadioButton::new(channel == value, label),
                         )
                         .clicked()
                         && channel != value
@@ -1523,84 +1983,80 @@ impl DeckPortApp {
                     }
                 }
             });
-        });
-
-        ui.add_space(8.0);
-        ui.group(|ui| {
-            ui.strong("Desktop Mode");
-            let mut enabled = autostart;
-
-            if ui
-                .add_enabled(
-                    !self.action_busy,
-                    egui::Checkbox::new(&mut enabled, "Start DeckPort VPN with Desktop Mode"),
+            ui.label(
+                egui::RichText::new(
+                    "Preview includes prereleases. Stable is recommended for everyday use.",
                 )
-                .changed()
-            {
-                match update_autostart_file(enabled) {
-                    Ok(()) => {
-                        self.request_mutation(
-                            "set_preferences",
-                            vec![json!({"autostart": enabled})],
-                            "Desktop startup preference changed",
-                            false,
-                        );
-                    }
-                    Err(message) => {
-                        self.error = message;
-                    }
-                }
-            }
+                .size(13.0)
+                .color(theme::MUTED),
+            );
         });
-
-        ui.add_space(8.0);
-        ui.group(|ui| {
-            ui.strong("Maintenance");
-
-            ui.horizontal(|ui| {
+        ui.add_space(10.0);
+        theme::section(ui, "Maintenance");
+        theme::card().show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            ui.horizontal_wrapped(|ui| {
                 if ui.button("Open Setup").clicked() {
                     match open_setup_window() {
-                        Ok(()) => {
-                            self.notice = "Setup opened".to_string();
-                            self.error.clear();
-                        }
-                        Err(message) => {
-                            self.error = message;
-                        }
+                        Ok(()) => { self.notice = "Setup opened".to_string(); self.error.clear(); }
+                        Err(message) => self.error = message,
                     }
                 }
-
-                if ui
-                    .add_enabled(
-                        !self.diagnostics_busy,
-                        egui::Button::new(
-                            if self.diagnostics_busy {
-                                "Loading diagnostics..."
-                            } else {
-                                "Refresh safe diagnostics"
-                            },
-                        ),
-                    )
-                    .clicked()
-                {
+                if ui.add_enabled(!self.diagnostics_busy && self.daemon_online, egui::Button::new(if self.diagnostics_busy { "Loading diagnostics…" } else { "Refresh safe diagnostics" })).clicked() {
                     self.request_diagnostics();
                 }
             });
-
-            ui.label(
-                "Diagnostics omit provider URLs, hosts, credentials, keys, and raw sing-box output.",
-            );
-
-            egui::ScrollArea::vertical()
-                .max_height(250.0)
-                .show(ui, |ui| {
-                    if self.diagnostics.is_empty() {
-                        ui.label("Diagnostics have not been loaded.");
-                    } else {
-                        ui.monospace(&self.diagnostics);
-                    }
-                });
+            ui.label(egui::RichText::new("Diagnostics omit provider URLs, hosts, credentials, keys, and raw sing-box output.").size(13.0).color(theme::MUTED));
+            egui::CollapsingHeader::new("Safe diagnostics").default_open(!self.diagnostics.is_empty()).show(ui, |ui| {
+                if self.diagnostics.is_empty() {
+                    ui.label(egui::RichText::new("Diagnostics have not been loaded.").color(theme::DIM));
+                } else {
+                    ui.monospace(&self.diagnostics);
+                }
+            });
         });
+    }
+
+    fn ui_shell(&mut self, ui: &mut egui::Ui) {
+        let area = ui.max_rect();
+        let sidebar_width = if area.width() >= 1100.0 { 238.0 } else { 218.0 };
+        let sidebar = egui::Rect::from_min_max(
+            area.min,
+            egui::pos2(area.left() + sidebar_width, area.bottom()),
+        );
+        ui.painter().rect_filled(area, 0, theme::BACKGROUND);
+        ui.painter().rect_filled(sidebar, 0, theme::SIDEBAR);
+        ui.painter().line_segment(
+            [sidebar.right_top(), sidebar.right_bottom()],
+            egui::Stroke::new(1.0, theme::BORDER),
+        );
+        ui.scope_builder(
+            egui::UiBuilder::new()
+                .id_salt("navigation")
+                .max_rect(sidebar.shrink2(egui::vec2(16.0, 14.0))),
+            |ui| self.ui_header(ui),
+        );
+        let content = egui::Rect::from_min_max(
+            egui::pos2(sidebar.right() + 26.0, area.top() + 28.0),
+            area.max - egui::vec2(26.0, 22.0),
+        );
+        ui.scope_builder(
+            egui::UiBuilder::new().id_salt("content").max_rect(content),
+            |ui| {
+                egui::ScrollArea::vertical()
+                    .id_salt(self.page as u8)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        self.ui_feedback(ui);
+                        match self.page {
+                            Page::Vpn => self.ui_vpn(ui),
+                            Page::Servers => self.ui_servers(ui),
+                            Page::Subscriptions => self.ui_subscriptions(ui),
+                            Page::Settings => self.ui_settings(ui),
+                        }
+                    });
+            },
+        );
     }
 }
 
@@ -1611,64 +2067,62 @@ impl eframe::App for DeckPortApp {
             ui.ctx().request_repaint_after(Duration::from_millis(150));
             return;
         }
-
         self.process_messages();
-
         if self.last_refresh.elapsed() >= Duration::from_secs(2) {
             self.request_refresh();
         }
-
-        {
-            let visuals = ui.visuals_mut();
-            visuals.dark_mode = true;
-            visuals.panel_fill = egui::Color32::from_rgb(6, 16, 25);
-            visuals.window_fill = egui::Color32::from_rgb(7, 18, 27);
-            visuals.faint_bg_color = egui::Color32::from_rgb(10, 28, 40);
-            visuals.extreme_bg_color = egui::Color32::from_rgb(5, 13, 20);
-            visuals.selection.bg_fill = egui::Color32::from_rgb(22, 88, 61);
-            visuals.selection.stroke =
-                egui::Stroke::new(1.0, egui::Color32::from_rgb(61, 240, 149));
-            visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(14, 34, 48);
-            visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(17, 48, 64);
-            visuals.widgets.active.bg_fill = egui::Color32::from_rgb(18, 71, 51);
-        }
-
-        ui.horizontal(|ui| {
-            egui::Frame::group(ui.style())
-                .fill(egui::Color32::from_rgb(7, 20, 30))
-                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(18, 43, 59)))
-                .show(ui, |ui| self.ui_header(ui));
-
-            ui.add_space(16.0);
-
-            let available = ui.available_size();
-            ui.allocate_ui_with_layout(
-                available,
-                egui::Layout::top_down(egui::Align::Center),
-                |ui| {
-                    ui.add_space(18.0);
-
-                    let content_width = ui.available_width().min(940.0);
-                    ui.allocate_ui_with_layout(
-                        egui::vec2(content_width, ui.available_height()),
-                        egui::Layout::top_down(egui::Align::Min),
-                        |ui| {
-                            self.ui_feedback(ui);
-
-                            match self.page {
-                                Page::Vpn => self.ui_vpn(ui),
-                                Page::Servers => self.ui_servers(ui),
-                                Page::Subscriptions => self.ui_subscriptions(ui),
-                                Page::Settings => self.ui_settings(ui),
-                            }
-                        },
-                    );
-                },
-            );
-        });
-
+        self.ui_shell(ui);
         ui.ctx().request_repaint_after(Duration::from_millis(150));
     }
+}
+
+fn connection_title(state: &str, online: bool) -> &'static str {
+    if !online {
+        return "Core unavailable";
+    }
+    match state {
+        "CONNECTED" => "Connected",
+        "CONNECTING" => "Connecting…",
+        "RECONNECTING" => "Reconnecting…",
+        "DISCONNECTING" => "Disconnecting…",
+        "ERROR" => "Connection error",
+        "DISCONNECTED" => "Disconnected",
+        _ => "Checking connection…",
+    }
+}
+
+fn power_action_label(state: &str, online: bool, selected: bool) -> &'static str {
+    if !online {
+        return "Waiting for the DeckPort service";
+    }
+    match state {
+        "CONNECTED" => "Disconnect VPN",
+        "CONNECTING" | "RECONNECTING" => "Cancel connection",
+        "DISCONNECTING" => "Disconnect VPN",
+        "ERROR" => "Reset connection",
+        _ if selected => "Connect VPN",
+        _ => "Choose a server to connect",
+    }
+}
+
+fn connection_uptime(since: Option<i64>) -> String {
+    let Some(since) = since.filter(|since| *since > 0) else {
+        return "—".into();
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(since);
+    duration_label(now.saturating_sub(since).max(0) as u64)
+}
+
+fn duration_label(seconds: u64) -> String {
+    format!(
+        "{:02}:{:02}:{:02}",
+        seconds / 3600,
+        seconds / 60 % 60,
+        seconds % 60
+    )
 }
 
 fn import_local_file() -> Result<Value, String> {
@@ -1849,5 +2303,114 @@ fn elapsed_label(timestamp: i64) -> String {
         format!("{}h {}m", seconds / 3600, seconds / 60 % 60)
     } else {
         format!("{}d", seconds / 86400)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn offline_app() -> DeckPortApp {
+        // Setup construction does not start IPC workers or touch user settings.
+        let mut app = DeckPortApp::new_setup();
+        app.setup = None;
+        app
+    }
+
+    #[test]
+    fn connection_labels_preserve_transitional_and_offline_states() {
+        assert_eq!(connection_title("CONNECTED", false), "Core unavailable");
+        assert_eq!(connection_title("CONNECTED", true), "Connected");
+        assert_eq!(connection_title("CONNECTING", true), "Connecting…");
+        assert_eq!(connection_title("RECONNECTING", true), "Reconnecting…");
+        assert_eq!(connection_title("DISCONNECTING", true), "Disconnecting…");
+        assert_eq!(connection_title("ERROR", true), "Connection error");
+    }
+
+    #[test]
+    fn power_button_describes_the_actual_action() {
+        assert_eq!(
+            power_action_label("CONNECTED", true, true),
+            "Disconnect VPN"
+        );
+        assert_eq!(
+            power_action_label("CONNECTING", true, true),
+            "Cancel connection"
+        );
+        assert_eq!(power_action_label("ERROR", true, true), "Reset connection");
+        assert_eq!(
+            power_action_label("DISCONNECTED", true, true),
+            "Connect VPN"
+        );
+        assert_eq!(
+            power_action_label("DISCONNECTED", true, false),
+            "Choose a server to connect"
+        );
+    }
+
+    #[test]
+    fn uptime_is_a_clock_and_missing_data_is_not_fabricated() {
+        assert_eq!(duration_label(754), "00:12:34");
+        assert_eq!(duration_label(3661), "01:01:01");
+        assert_eq!(duration_label(360_000), "100:00:00");
+        assert_eq!(connection_uptime(None), "—");
+        assert_eq!(connection_uptime(Some(0)), "—");
+    }
+
+    #[test]
+    fn disconnected_view_does_not_reuse_the_previous_active_server() {
+        let mut app = offline_app();
+        app.daemon_online = true;
+        app.status = json!({"state": "DISCONNECTED", "server": {"name": "Old"}, "selected_server": {"name": "Next"}});
+        assert_eq!(app.connection_server()["name"], "Next");
+        app.status["state"] = json!("CONNECTED");
+        assert_eq!(app.connection_server()["name"], "Old");
+    }
+
+    #[test]
+    fn losing_the_daemon_does_not_claim_a_secure_connection() {
+        let mut app = offline_app();
+        app.daemon_online = true;
+        app.status = json!({"state": "CONNECTED"});
+        app.tx
+            .send(WorkerMessage::Snapshot(Err("Service unavailable".into())))
+            .unwrap();
+        app.process_messages();
+        assert!(!app.daemon_online);
+        assert_eq!(
+            connection_title(app.state(), app.daemon_online),
+            "Core unavailable"
+        );
+    }
+
+    #[test]
+    fn all_pages_render_at_desktop_and_minimum_window_sizes() {
+        for size in [[1280.0, 760.0], [800.0, 560.0]] {
+            for page in [
+                Page::Vpn,
+                Page::Servers,
+                Page::Subscriptions,
+                Page::Settings,
+            ] {
+                let mut app = offline_app();
+                app.page = page;
+                let ctx = egui::Context::default();
+                theme::apply(&ctx);
+                for _ in 0..3 {
+                    let output = ctx.run_ui(
+                        egui::RawInput {
+                            screen_rect: Some(egui::Rect::from_min_size(
+                                egui::Pos2::ZERO,
+                                egui::vec2(size[0], size[1]),
+                            )),
+                            ..Default::default()
+                        },
+                        |ui| app.ui_shell(ui),
+                    );
+                    assert!(!output.shapes.is_empty());
+                    output.drop_without_applying_deltas();
+                }
+            }
+        }
     }
 }

@@ -1,21 +1,31 @@
-# DeckPort VPN 0.2.10
+# DeckPort VPN 0.2.11
 
-DeckPort VPN 0.2.10 focuses on a smoother Steam Deck install/update experience, broader subscription-link handling, and a redesigned native Desktop client.
+Новый нативный интерфейс Desktop Mode в стиле DeckPort.
 
-Highlights:
+## Интерфейс
 
-- automatic low-space update fallback for SteamOS systems with a small `/var`;
-- the normal transactional update is still attempted first;
-- on a real `ENOSPC` during an existing installation, DeckPort removes only old program files and retries the already verified payload;
-- subscriptions, favorites, preferences, credentials, settings and logs are preserved because the fallback uses uninstall with `purge=False`;
-- first-time installs never use the destructive low-space fallback;
-- non-space filesystem errors never trigger replacement mode;
-- KDE application cache is refreshed after a successful install so DeckPort VPN appears in the Desktop application menu immediately;
-- generic HTTP/HTTPS provider subscription URLs are supported even when the URL has no file extension;
-- pasted provider URLs and local text files containing a single provider URL are stored as URL subscriptions so Refresh/Edit keep working correctly;
-- subscription detection is stricter for supported direct URI schemes and remains compatible with the existing VLESS, VMess, Trojan, Shadowsocks and SOCKS URI paths;
-- native Desktop Mode client redesigned with Steam Deck-friendly dark navigation, a large Connect/Disconnect control, connection details, and clearer server/subscription/settings screens;
-- native Desktop Mode client, shared daemon state, Ping All and favorites remain integrated through `deckportd`;
-- bundled and checksum-pinned sing-box 1.14.0 core.
+- Тёмная тема с зелёными акцентами, едиными карточками и векторными иконками.
+- Home: большая кнопка подключения, декоративная карта мира, состояние VPN,
+  выбранный сервер, время подключения, протокол и измеренная TCP-задержка.
+- Servers: поиск, сортировка, выделение выбранного сервера и избранное.
+- Subscriptions: карточки подписок, обновление, импорт и редактирование.
+- Settings: автозапуск приложения, канал обновлений, Setup и безопасная диагностика.
+- Компоновка для окна 1280 × 760 и минимального размера 800 × 560.
 
-Release validation covers Python tests, TypeScript build/typecheck, locked Rust build and clippy, payload verification, rollback checks and isolated Linux TUN traffic. Steam Deck LCD/OLED hardware acceptance remains a separate manual check and is not claimed by CI.
+Сохранено взаимодействие с существующим deckportd. При недоступном сервисе
+интерфейс явно показывает отсутствие подключения. Auto Connect и Kill Switch
+отображаются как неподдерживаемые и недоступны для включения; счётчики трафика
+не имитируются.
+
+## Файлы релиза
+
+- `deckport-vpn-0.2.11-payload.zip` и SHA-256 — установка и обновление.
+- `decky-vpn-0.2.11.zip` и SHA-256 — совместимый архив для Decky.
+- `deckport-vpn-v0.2.11-source.zip` — соответствующие исходники и лицензии.
+
+## Проверки
+
+Перед публикацией выполняются Rust fmt/clippy/tests, сборка нативного клиента,
+TypeScript typecheck/build, Python-тесты, проверка установочного payload и
+изолированный Linux TUN smoke test. Проверка внешнего вида и VPN на реальных
+Steam Deck LCD/OLED остаётся отдельным ручным этапом и не заявляется результатом CI.

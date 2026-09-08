@@ -29,6 +29,7 @@ jobs:
         run: |
           cargo fmt --manifest-path desktop-native/Cargo.toml -- --check
           cargo clippy --manifest-path desktop-native/Cargo.toml --locked -- -D warnings
+          cargo test --manifest-path desktop-native/Cargo.toml --locked
       - name: Build native Desktop client
         run: |
           cargo build --manifest-path desktop-native/Cargo.toml --release --locked

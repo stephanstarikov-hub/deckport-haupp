@@ -119,13 +119,13 @@ Closing Decky or the Desktop application does not intentionally terminate an act
 - internet access during installation
 - a supported VPN subscription
 
-### Install 0.2.10
+### Install 0.2.11
 
 Open Konsole in Desktop Mode:
 
 ```bash
-curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.10/install.sh -o /tmp/deckport-install.sh
-bash /tmp/deckport-install.sh --version 0.2.10
+curl -fL https://raw.githubusercontent.com/stephanstarikov-hub/deckport-haupp/v0.2.11/install.sh -o /tmp/deckport-install.sh
+bash /tmp/deckport-install.sh --version 0.2.11
 ```
 
 The installer:
